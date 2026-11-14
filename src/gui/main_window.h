@@ -71,6 +71,11 @@ class MainWindow {
   // Lower-sideband operation: audio frequency rises as RF falls. RTTY is LSB by
   // convention, so this is also the assumption without a rig.
   bool lsbLike() const;
+  // The rig is on the upper sideband and gtty follows it: mark and space are exchanged.
+  bool sidebandSwap() const;
+  // The tones in use: the configured ones, exchanged while sidebandSwap().
+  RttyParams activeRtty() const;
+  bool sidebandSwapped_ = false;   // what the decoders and the transmitter were last given
   void updateWaterfallDirection();
   void setDial(double hz);          // QSY the rig, or the manual dial when no rig
   void updateBandHighlight();

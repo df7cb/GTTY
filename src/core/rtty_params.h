@@ -1,5 +1,6 @@
 #pragma once
 #include <cmath>
+#include <string>
 
 #include "core/baudot.h"
 
@@ -25,10 +26,23 @@ struct RttyParams {
   bool unshiftOnSpace = true;
 
   double spaceFreq() const { return reverse ? markFreq - shift : markFreq + shift; }
+  // The same two tones with mark and space exchanged. The default pair (mark below
+  // space) is right for a receiver on the lower sideband, the amateur convention; on
+  // the upper sideband the audio is mirrored and the signal's mark is the higher tone.
+  RttyParams swappedTones() const {
+    RttyParams p = *this;
+    p.setTones(spaceFreq(), markFreq);
+    return p;
+  }
   double centerFreq() const { return (markFreq + spaceFreq()) / 2.0; }
   double bitPeriod() const { return 1.0 / baud; }
   // Start bit + 5 data + stop bits.
   double charPeriod() const { return (1.0 + 5.0 + stopBits) / baud; }
 };
+
+// Whether a rig mode (Hamlib name) puts the audio on the upper sideband. RTTYR is left
+// out on purpose: the operator chose the rig's reverse, typically for a station that
+// sends reversed, and following it would undo that.
+inline bool isUpperSidebandMode(const std::string& mode) { return mode == "USB" || mode == "PKTUSB"; }
 
 }  // namespace gtty

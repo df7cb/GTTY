@@ -618,7 +618,8 @@ GtkWidget* MainWindow::buildControlRow() {
   };
   afcCheck_ = check("AFC", "Automatic frequency control");
   atcCheck_ = check("ATC", "Automatic threshold control");
-  revCheck_ = check("Rev", "Reverse: space tone below mark. Unticked (default): space above mark, 2125 / 2295");
+  revCheck_ = check("Rev", "Reverse mark and space, for a station that sends reversed. Unticked (default): space above mark, 2125 / 2295, "
+                           "as heard on the lower sideband; with the rig in USB the two are swapped automatically (Preferences → RTTY)");
   netCheck_ = check("Net", "Transmit on the AFC-tracked receive tones");
   autoRxCheck_ = check("Auto RX", "Return to receive automatically after the TX buffer empties (delay in Preferences)");
   autoCqCheck_ = gtk_check_button_new_with_label("Auto CQ");
@@ -794,7 +795,7 @@ void MainWindow::openAudio() {
   std::string txErr;
   TxConfig txc = settings_.tx;
   if (txc.cwIdText.empty()) txc.cwIdText = settings_.myCall;
-  if (!tx_.configure(txc, settings_.rtty, txErr)) toast("TX: " + txErr);
+  if (!tx_.configure(txc, activeRtty(), txErr)) toast("TX: " + txErr);
 }
 
 void MainWindow::openRig() {
@@ -813,16 +814,18 @@ void MainWindow::openRig() {
 
 void MainWindow::applyRttyParams(bool resetAfc) {
   DemodConfig c = rx_.config();
-  c.params = settings_.rtty;
+  const RttyParams active = activeRtty();
+  sidebandSwapped_ = sidebandSwap();
+  c.params = active;
   c.afc = settings_.afc;
   c.atc = settings_.atc;
   c.afcRangeHz = settings_.afcRangeHz;
   c.squelch = settings_.squelch;
   rx_.configure(c);
   if (resetAfc) rx_.resetAfc();
-  tx_.setParams(settings_.rtty);
-  wf_.setNominalTones(settings_.rtty.markFreq, settings_.rtty.spaceFreq());
-  wf_.setTones(settings_.rtty.markFreq, settings_.rtty.spaceFreq());
+  tx_.setParams(active);
+  wf_.setNominalTones(active.markFreq, active.spaceFreq());
+  wf_.setTones(active.markFreq, active.spaceFreq());
   wf_.setRange(settings_.waterfallLoHz, settings_.waterfallHiHz);
   updateWaterfallDirection();
   if (tonesDrop_) {
@@ -974,7 +977,8 @@ void MainWindow::handle(const Event& e) {
       gtk_label_set_text(GTK_LABEL(afcLabel_), buf);
       gtk_level_bar_set_value(GTK_LEVEL_BAR(qualityBar_), std::clamp(st->status.quality, 0.f, 1.f));
       scope_.setLevels(st->status.markLevel, st->status.spaceLevel);
-      wf_.setTones(settings_.rtty.markFreq + primaryAfc_, settings_.rtty.spaceFreq() + primaryAfc_);
+      const RttyParams active = activeRtty();
+      wf_.setTones(active.markFreq + primaryAfc_, active.spaceFreq() + primaryAfc_);
     }
   } else if (auto* lv = std::get_if<LevelEvent>(&e)) {
     gtk_level_bar_set_value(GTK_LEVEL_BAR(levelBar_), std::clamp(lv->rxPeak, 0.f, 1.f));
@@ -983,6 +987,11 @@ void MainWindow::handle(const Event& e) {
     rigState_ = rs->state;
     updateFreqDisplay(rigState_);
     updateWaterfallDirection();
+    // The rig changed sideband (or came, or went): the tones follow it.
+    if (sidebandSwap() != sidebandSwapped_) {
+      applyRttyParams(true);
+      toast(sidebandSwapped_ ? "Rig on the upper sideband: mark and space swapped" : "Mark and space as configured");
+    }
     if (wasConnected != rigState_.connected) updateRigControls();
   } else if (auto* ptt = std::get_if<PttEvent>(&e)) {
     pttText_.clear();   // poll() rewrites the label
@@ -1011,6 +1020,14 @@ bool MainWindow::lsbLike() const {
   if (!rigState_.connected) return true;
   const std::string& m = rigState_.mode;
   return m == "LSB" || m == "RTTY" || m == "PKTLSB" || m == "CWR";
+}
+
+bool MainWindow::sidebandSwap() const {
+  return settings_.followRigSideband && rigState_.connected && isUpperSidebandMode(rigState_.mode);
+}
+
+RttyParams MainWindow::activeRtty() const {
+  return sidebandSwap() ? settings_.rtty.swappedTones() : settings_.rtty;
 }
 
 void MainWindow::updateWaterfallDirection() {
@@ -1151,7 +1168,7 @@ void MainWindow::clearText() {
 
 void MainWindow::startTx() {
   if (tx_.transmitting() && !tx_.stopping()) return;
-  RttyParams p = settings_.rtty;
+  RttyParams p = activeRtty();
   if (settings_.netTx) p.markFreq += primaryAfc_;
   tx_.setParams(p);
   txSentAny_ = false;
@@ -2135,7 +2152,7 @@ void MainWindow::sendCwId() {
 
 void MainWindow::startTune() {
   if (tx_.transmitting() && !tx_.tuning()) { toast("Stop transmitting first"); return; }
-  RttyParams p = settings_.rtty;
+  RttyParams p = activeRtty();
   if (settings_.netTx) p.markFreq += primaryAfc_;
   tx_.setParams(p);
   if (!tx_.startTune()) toast("Tune failed");
@@ -2522,7 +2539,7 @@ void MainWindow::gtSendStatus() {
   st.transmitting = tx_.transmitting();
   st.txEnabled = st.transmitting;
   st.decoding = !st.transmitting;
-  st.rxDf = static_cast<uint32_t>(std::lround(settings_.rtty.markFreq + primaryAfc_));
+  st.rxDf = static_cast<uint32_t>(std::lround(activeRtty().markFreq + primaryAfc_));
   st.txDf = st.rxDf;
   st.deCall = settings_.myCall;
   st.deGrid = settings_.myGrid;
@@ -2551,7 +2568,7 @@ void MainWindow::gtReportLine(const std::string& line) {
     float q = 0;
     if (rx_.bank().size() > 0) q = rx_.bank().slot(0).demod->status().quality;
     d.snr = static_cast<int32_t>(std::lround(q * 30.0f - 15.0f));
-    d.deltaFreq = static_cast<uint32_t>(std::lround(settings_.rtty.markFreq + primaryAfc_));
+    d.deltaFreq = static_cast<uint32_t>(std::lround(activeRtty().markFreq + primaryAfc_));
     d.mode = "RTTY";
     // Shape it like a WSJT-X message so GridTracker's parser finds the call and grid.
     d.message = (toMe ? my : std::string("CQ")) + " " + call + (grid.empty() ? "" : " " + grid);

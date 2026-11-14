@@ -27,7 +27,7 @@ struct Prefs {
   struct DecRows { GtkWidget *enabled = nullptr, *show = nullptr, *votes = nullptr, *mode = nullptr, *filterBits = nullptr, *window = nullptr, *atcTau = nullptr; };
   std::vector<DecRows> dec;
   GtkWidget *showVote, *skimmer, *skimmerStep;
-  GtkWidget *baud, *mark, *space, *preset, *stopBits, *variant, *uos, *afcRange, *netTx;
+  GtkWidget *baud, *mark, *space, *preset, *stopBits, *variant, *uos, *afcRange, *netTx, *followSideband;
   bool applyingPreset = false;
   GtkWidget *txMethod, *fskDevice, *fskInvert, *diddle, *afskLevel, *pttViaRig, *txMode, *preamble, *pttLead;
   GtkWidget *autoRx, *autoRxDelay, *clearTxOnRx, *wordMode, *autoCqInterval, *autoCqMacro;
@@ -156,6 +156,7 @@ void onClosed(AdwDialog*, gpointer p) {
   s.rtty.unshiftOnSpace = active(pr->uos);
   s.afcRangeHz = value(pr->afcRange);
   s.netTx = active(pr->netTx);
+  s.followRigSideband = active(pr->followSideband);
 
   s.tx.method = static_cast<TxConfig::Method>(selected(pr->txMethod));
   s.tx.fskDevice = text(pr->fskDevice);
@@ -293,6 +294,8 @@ void showPrefsDialog(GtkWidget* parent, Settings& s, std::function<void()> onApp
     };
     g_signal_connect(pr->mark, "notify::value", G_CALLBACK(toCustom), pr);
     g_signal_connect(pr->space, "notify::value", G_CALLBACK(toCustom), pr);
+    pr->followSideband = toggle(g, "Follow the rig's sideband", s.followRigSideband,
+                                "Swap mark and space while the rig is in USB or PKTUSB, as Fldigi does. Rev is then only for a station that sends reversed. Needs rig control");
     pr->stopBits = combo(g, "Stop bits (TX)", {"1.5", "2"}, s.rtty.stopBits >= 2.0 ? 1 : 0);
     GtkWidget* g2 = group(pg, "Code");
     pr->variant = combo(g2, "Character set", {"ITA2", "US-TTY"}, s.rtty.variant == BaudotVariant::ITA2 ? 0 : 1);

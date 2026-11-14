@@ -119,7 +119,7 @@ The controls sit in one row when the window is wide enough and wrap onto further
 | **⋮** | Opens **Shift** (170, 200, 425, 450 or 850 Hz) and **Tones** (mark/space presets; *Custom* when the tones were set freely in Preferences) |
 | **AFC** | Automatic frequency control follows the signal within the AFC range |
 | **ATC** | Automatic threshold control normalizes the mark and space levels |
-| **Rev** | Reverse: space tone below mark |
+| **Rev** | Reverse mark and space, for a station that sends reversed. With rig control the tones already follow the rig's sideband (see [Tuning](tuning.md)) |
 | **Net** | Transmit on the AFC-tracked receive tones rather than the nominal ones |
 | **Auto RX** | Return to receive automatically once the transmit buffer has been empty for the configured delay |
 | **Auto CQ** | Repeat the CQ macro with a pause between calls until a callsign is entered. Not shown in modem-only view, where the logger sends the CQs |
