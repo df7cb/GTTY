@@ -9,6 +9,7 @@
 
 #include "core/audio/audio_engine.h"
 #include "core/events.h"
+#include "core/line_breaks.h"
 #include "core/log/callbook.h"
 #include "core/log/callsign.h"
 #include "core/log/logbook.h"
@@ -277,6 +278,7 @@ class MainWindow {
   int64_t txEndedAt_ = 0;
   bool autoCq_ = false;
   std::vector<bool> rxLineStart_;
+  std::vector<LineBreaks> rxBreaks_;  // per pane: CR, LF, CR LF -> one line break
   std::vector<GtkTextTag*> timeTags_;
   std::ofstream sessionFile_;
   std::string sessionDate_;

@@ -297,6 +297,7 @@ GtkWidget* MainWindow::buildRxPanes() {
   rxViews_.resize(n); rxBufs_.resize(n); rxEndMarks_.resize(n); rxWord_.resize(n);
   callTags_.resize(n); scpTags_.resize(n); echoTags_.resize(n); timeTags_.resize(n);
   rxLineStart_.assign(n, true);
+  rxBreaks_.assign(n, LineBreaks{});
   rxPanes_.assign(n, nullptr);
   modeDrops_.assign(engines, nullptr);
   // Layout: the best-guess pane full width on top, the engine panes side by
@@ -1001,8 +1002,9 @@ void MainWindow::appendRx(int slot, const std::string& text) {
   if (slot < 0 || slot >= static_cast<int>(rxBufs_.size())) return;
   GtkTextBuffer* buf = rxBufs_[slot];
   std::string& word = rxWord_[slot];
-  for (char c : text) {
-    if (c == '\r') continue;
+  for (char raw : text) {
+    char c = rxBreaks_[slot].feed(raw);
+    if (c == 0) continue;
     if (slot == rx_.primarySlot()) {
       if (c == '\n') { gtReportLine(rxLine_); rxLine_.clear(); }
       else { rxLine_.push_back(c); if (rxLine_.size() > 400) { gtReportLine(rxLine_); rxLine_.clear(); } }
@@ -1063,6 +1065,7 @@ void MainWindow::clearRx() {
     gtk_text_buffer_set_text(rxBufs_[i], "", -1);
     rxWord_[i].clear();
     rxLineStart_[i] = true;
+    rxBreaks_[i].reset();
   }
 }
 
