@@ -2128,8 +2128,8 @@ void MainWindow::applyCallbook(const CallbookResult& r) {
 
 void MainWindow::sendCwId() {
   if (settings_.tx.cwIdText.empty() && settings_.myCall.empty()) { toast("CW ID: set your callsign in Preferences → Station"); return; }
-  if (tx_.config().method != TxConfig::Method::Afsk && !settings_.tx.pttViaRig)
-    toast("CW ID with FSK keying needs PTT through the rig");
+  if (tx_.config().method != TxConfig::Method::Afsk && !settings_.tx.pttViaRig && !rig_.ownsPttLine())
+    toast("CW ID with FSK keying needs PTT through the rig or on a serial line");
   tx_.sendCwId();
 }
 

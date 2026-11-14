@@ -26,7 +26,7 @@ struct TxConfig {
   bool fskInvert = false;
   bool diddle = true;         // send LTRS when idle during TX
   float afskLevel = 0.5f;     // 0..1
-  bool pttViaRig = true;      // use Hamlib PTT (else VOX / external)
+  bool pttViaRig = true;      // key PTT through the rig backend (CAT, or DTR/RTS on the rig's port); else VOX / external
   std::string txMode;         // rig mode to select on TX start (empty = leave)
   int ltrsPreamble = 2;       // LTRS characters before the text
   int pttLeadMs = 100;        // delay between PTT on and first character
@@ -77,6 +77,10 @@ class Transmitter : private TxSource {
  private:
   void generate(float* out, size_t n) override;  // TxSource (audio thread)
   void setPtt(bool on);
+  // Whether gtty keys PTT at all. A line on a serial port of its own (Preferences → Rig)
+  // is always keyed: naming the port is the instruction, and "through the rig" does not
+  // describe it. That option decides only about PTT through the rig backend.
+  bool keysPtt() const;
   void echoCode(uint8_t code);
   void pumpCatText();
   bool keyedCwId() const;        // CW ID goes out by keying PTT (non-AFSK methods)

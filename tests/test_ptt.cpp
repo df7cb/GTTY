@@ -10,6 +10,7 @@
 
 #include "core/rig/rig_control.h"
 #include "core/rig/serial_ptt.h"
+#include "core/transmitter.h"
 #include "check.h"
 
 using namespace gtty;
@@ -90,5 +91,44 @@ int main() {
   CHECK(!rig.isOpen());
   rig.close();
   CHECK(!rig.canPtt());
+
+  // ----------------------------------------------- the transmitter and "PTT through the rig"
+  // A PTT line on its own port is keyed whether or not "Key PTT through the rig" is on:
+  // that option is about the rig backend, and someone with a PTT port of their own turns
+  // it off. The port here does not exist, so an attempt to key shows as "PTT failed".
+  for (bool viaRig : {true, false}) {
+    RigControl own;
+    EventQueue events;
+    std::string e;
+    CHECK(!own.openPttPort(bad, e));
+    CHECK(own.ownsPttLine());
+    Transmitter tx(nullptr, &own, &events);
+    TxConfig tc;
+    tc.pttViaRig = viaRig;
+    CHECK(tx.configure(tc, RttyParams{}, e));
+    tx.startTx();
+    bool tried = false;
+    Event ev;
+    while (events.pop(ev))
+      if (auto* m = std::get_if<MessageEvent>(&ev)) tried = tried || m->text.find("PTT failed") != std::string::npos;
+    CHECK(tried);
+    tx.abortTx();
+  }
+  // With no PTT port and no rig there is nothing to key, and nothing is attempted.
+  {
+    RigControl noRig;
+    EventQueue events;
+    std::string e;
+    CHECK(noRig.openPttPort(none, e));
+    CHECK(!noRig.ownsPttLine());
+    Transmitter tx(nullptr, &noRig, &events);
+    tx.startTx();
+    bool tried = false;
+    Event ev;
+    while (events.pop(ev))
+      if (auto* m = std::get_if<MessageEvent>(&ev)) tried = tried || m->text.find("PTT failed") != std::string::npos;
+    CHECK(!tried);
+    tx.abortTx();
+  }
   TEST_MAIN_END();
 }
