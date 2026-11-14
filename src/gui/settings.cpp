@@ -276,6 +276,7 @@ bool Settings::loadFrom(const std::string& path) {
   afcRangeHz = dbl(kf, "rtty", "afc_range", afcRangeHz);
   squelch = static_cast<float>(dbl(kf, "rtty", "squelch", squelch));
   netTx = boolean(kf, "rtty", "net_tx", netTx);
+  followRigSideband = boolean(kf, "rtty", "follow_sideband", followRigSideband);
   for (size_t i = 0; i < decoders.size(); ++i) {
     std::string k = std::to_string(i);
     auto& d = decoders[i];
@@ -402,6 +403,7 @@ bool Settings::saveTo(const std::string& path) const {
   g_key_file_set_double(kf, "rtty", "afc_range", afcRangeHz);
   g_key_file_set_double(kf, "rtty", "squelch", squelch);
   g_key_file_set_boolean(kf, "rtty", "net_tx", netTx);
+  g_key_file_set_boolean(kf, "rtty", "follow_sideband", followRigSideband);
   for (size_t i = 0; i < decoders.size(); ++i) {
     std::string k = std::to_string(i);
     const auto& d = decoders[i];

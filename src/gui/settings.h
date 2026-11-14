@@ -82,6 +82,7 @@ struct Settings {
   double afcRangeHz = 60;
   float squelch = 0.0f;
   bool netTx = true;          // TX follows AFC-tracked RX tones
+  bool followRigSideband = true;   // swap mark and space while the rig is on the upper sideband
   std::vector<DecoderSlotSettings> decoders = defaultDecoderSettings();
   bool showVotePane = true;   // merged best-guess pane
   bool skimmerEnabled = false;
