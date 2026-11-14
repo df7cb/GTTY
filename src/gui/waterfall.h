@@ -2,6 +2,8 @@
 #pragma once
 #include <gtk/gtk.h>
 
+#include "core/dsp/noise_floor.h"
+
 #include <functional>
 #include <vector>
 
@@ -62,6 +64,8 @@ class Waterfall {
   std::vector<float> lastDb_;
   double binHz_ = 1;
   float floorDb_ = -80, rangeDb_ = 60;  // auto-tracked
+  NoiseFloorTracker noise_;
+  gint64 lastSpectrumUs_ = 0;
   double hoverHz_ = -1;
   std::vector<double> notches_;
   // drag state

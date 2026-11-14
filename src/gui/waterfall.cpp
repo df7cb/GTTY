@@ -54,6 +54,7 @@ void Waterfall::setRange(double loHz, double hiHz) {
   hiHz = std::max(hiHz, loHz + 100);
   if (loHz == lo_ && hiHz == hi_) return;
   lo_ = loHz; hi_ = hiHz;
+  noise_.reset();
   blankHistory();
 }
 
@@ -127,12 +128,13 @@ void Waterfall::addSpectrum(const std::vector<float>& db, double binHz) {
   }
   if (!surf_ || sw_ <= 0 || sh_ <= 0) { gtk_widget_queue_draw(area_); return; }
 
-  // Track the noise floor (median-ish) and peak for auto-ranging.
+  // Track the noise floor and peak for auto-ranging.
   size_t b0 = std::min(db.size() - 1, static_cast<size_t>(lo_ / binHz)), b1 = std::min(db.size() - 1, static_cast<size_t>(hi_ / binHz));
   if (b1 <= b0 + 2) return;
-  std::vector<float> tmp(db.begin() + b0, db.begin() + b1);
-  std::nth_element(tmp.begin(), tmp.begin() + tmp.size() / 3, tmp.end());
-  float fl = tmp[tmp.size() / 3];
+  gint64 now = g_get_monotonic_time();
+  double dt = lastSpectrumUs_ ? (now - lastSpectrumUs_) / 1e6 : 0.0;
+  lastSpectrumUs_ = now;
+  float fl = noise_.update(db.data() + b0, b1 - b0, binHz, dt);
   floorDb_ = 0.95f * floorDb_ + 0.05f * fl;
   float peak = *std::max_element(db.begin() + b0, db.begin() + b1);
   float desired = std::max(30.f, peak - floorDb_ + 6.f);
