@@ -1048,16 +1048,18 @@ void MainWindow::appendRx(int slot, const std::string& text) {
 }
 
 void MainWindow::appendEcho(const std::string& text) {
-  if (rxBufs_.empty()) return;
-  GtkTextBuffer* buf = rxBufs_[0];
-  GtkTextIter end;
-  gtk_text_buffer_get_end_iter(buf, &end);
   std::string t;
   for (char c : text) if (c != '\r') t.push_back(c);
   sessionWrite(t, true);
-  if (!t.empty()) rxLineStart_[0] = (t.back() == '\n');
-  gtk_text_buffer_insert_with_tags(buf, &end, t.c_str(), -1, echoTags_[0], nullptr);
-  gtk_text_view_scroll_mark_onscreen(GTK_TEXT_VIEW(rxViews_[0]), rxEndMarks_[0]);
+  if (t.empty()) return;
+  // Every pane shows what was sent, so the exchange reads in order whichever one is watched.
+  for (size_t i = 0; i < rxBufs_.size(); ++i) {
+    GtkTextIter end;
+    gtk_text_buffer_get_end_iter(rxBufs_[i], &end);
+    rxLineStart_[i] = (t.back() == '\n');
+    gtk_text_buffer_insert_with_tags(rxBufs_[i], &end, t.c_str(), -1, echoTags_[i], nullptr);
+    gtk_text_view_scroll_mark_onscreen(GTK_TEXT_VIEW(rxViews_[i]), rxEndMarks_[i]);
+  }
 }
 
 void MainWindow::clearRx() {
@@ -2123,13 +2125,17 @@ std::string MainWindow::unsentTxText() const {
 void MainWindow::onTxEnded() {
   txEndedAt_ = g_get_monotonic_time();
   if (settings_.clearTxOnRx) clearTxBuffer();
-  if (!rxBufs_.empty() && !rxLineStart_[0]) {
+  // End the transmitted line in every pane that showed it; the session file gets one line end.
+  bool ended = false;
+  for (size_t i = 0; i < rxBufs_.size(); ++i) {
+    if (rxLineStart_[i]) continue;
     GtkTextIter end;
-    gtk_text_buffer_get_end_iter(rxBufs_[0], &end);
-    gtk_text_buffer_insert(rxBufs_[0], &end, "\n", 1);
-    rxLineStart_[0] = true;
-    sessionWrite("\n", true);
+    gtk_text_buffer_get_end_iter(rxBufs_[i], &end);
+    gtk_text_buffer_insert(rxBufs_[i], &end, "\n", 1);
+    rxLineStart_[i] = true;
+    if (i == 0) ended = true;
   }
+  if (ended) sessionWrite("\n", true);
 }
 
 void MainWindow::setAutoCq(bool on) {
