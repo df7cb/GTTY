@@ -61,6 +61,8 @@ class RigControl {
   // True when PTT is this object's to key: a PTT port is configured (setPtt() fails with
   // the reason if it could not be opened), or else the rig is open.
   bool canPtt() const { return ownPttPort_ || rig_ != nullptr; }
+  // PTT is a DTR/RTS line on a serial port of its own, keyed here and not by the rig backend.
+  bool ownsPttLine() const { return ownPttPort_; }
   const RigConfig& config() const { return cfg_; }
 
   RigState state() const;

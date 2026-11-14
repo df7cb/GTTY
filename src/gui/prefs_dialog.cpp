@@ -349,7 +349,8 @@ void showPrefsDialog(GtkWidget* parent, Settings& s, std::function<void()> onApp
     pr->wordMode = toggle(g, "Word mode type-ahead", s.txWordMode, "Send typed text only after each space or Enter, so typos can be fixed");
     pr->afskLevel = spin(g, "AFSK level (%)", 1, 100, 1, s.tx.afskLevel * 100.0);
     GtkWidget* g2 = group(pg, "Sequencing");
-    pr->pttViaRig = toggle(g2, "Key PTT through the rig", s.tx.pttViaRig);
+    pr->pttViaRig = toggle(g2, "Key PTT through the rig", s.tx.pttViaRig,
+                           "Off for VOX or external keying. A PTT line on a serial port of its own (Rig page) is keyed either way");
     static const char* modes[] = {"", "RTTY", "RTTYR", "LSB", "USB", "PKTLSB", "PKTUSB"};
     int modeSel = 0;
     for (int i = 0; i < 7; ++i) if (s.tx.txMode == modes[i]) modeSel = i;
