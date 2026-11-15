@@ -25,6 +25,11 @@ std::string formatSpotLine(const std::string& spotter, double freqHz, const std:
 // A word the text ends in is not considered, since it may be only the start of a
 // callsign. `myCall` is never returned. `cq` is set when the text holds a CQ or TEST.
 std::string spottableCall(const std::string& text, const std::string& myCall, bool* cq = nullptr);
+// The station calling CQ in `text`, or "": the call that goes with a CQ or TEST ("CQ TEST
+// K5XOM K5XOM", "CQ CQ DE K1ABC", "TU DF7C CQ"), not any call heard. In a contest the
+// callers answer on the runner's frequency, so a Skimmer channel hears both (issue #51).
+// The call must be complete and announced as for spottableCall; the last runner heard wins.
+std::string cqCall(const std::string& text, const std::string& myCall);
 
 class SpotServer {
  public:

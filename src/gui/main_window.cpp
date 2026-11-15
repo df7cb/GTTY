@@ -1980,7 +1980,21 @@ GtkWidget* MainWindow::buildBandMap() {
   gtk_widget_add_css_class(skimStatus_, "dim-label");
   gtk_label_set_xalign(GTK_LABEL(skimStatus_), 0.f);
   gtk_label_set_ellipsize(GTK_LABEL(skimStatus_), PANGO_ELLIPSIZE_END);
-  gtk_box_append(GTK_BOX(skimPage), skimStatus_);
+  GtkWidget* skimHead = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
+  gtk_widget_set_hexpand(skimStatus_, TRUE);
+  gtk_box_append(GTK_BOX(skimHead), skimStatus_);
+  GtkWidget* skimCq = gtk_check_button_new_with_label("CQ only");
+  gtk_widget_set_tooltip_text(skimCq, "Only stations calling CQ, not those answering them");
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(skimCq), settings_.skimmerCqOnly);
+  g_signal_connect(skimCq, "toggled", G_CALLBACK(+[](GtkCheckButton* b, gpointer p) {
+    auto* self = static_cast<MainWindow*>(p);
+    self->settings_.skimmerCqOnly = gtk_check_button_get_active(b);
+    self->settings_.save();
+    self->skimDirty_ = true;
+    self->rebuildSkimList();
+  }), this);
+  gtk_box_append(GTK_BOX(skimHead), skimCq);
+  gtk_box_append(GTK_BOX(skimPage), skimHead);
   GtkWidget* skimScroll = gtk_scrolled_window_new();
   gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(skimScroll), GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
   gtk_widget_set_vexpand(skimScroll, TRUE);
@@ -2053,7 +2067,7 @@ void MainWindow::onSkimmerText(const SkimmerTextEvent& e) {
   for (auto& s : skim_)
     if (std::fabs(s.rfHz - rf) <= settings_.skimmerStepHz + 5) { hit = &s; break; }
   if (!hit) {
-    skim_.push_back({rf, "", "", now, e.quality});
+    skim_.push_back({rf, "", "", "", now, e.quality});
     hit = &skim_.back();
   }
   hit->rfHz = 0.8 * hit->rfHz + 0.2 * rf;
@@ -2063,6 +2077,10 @@ void MainWindow::onSkimmerText(const SkimmerTextEvent& e) {
   for (char c : e.text) hit->text.push_back(c == '\n' || c == '\r' ? ' ' : c);
   if (hit->text.size() > 160) hit->text.erase(0, hit->text.size() - 160);
   for (const auto& [pos, len] : findCallsigns(hit->text)) hit->call = upper(hit->text.substr(pos, len));
+  // A station running a frequency keeps it: once heard calling CQ it stays this entry's
+  // runner, through QSOs whose copy loses the CQ ("CQ W9TD" can arrive as "CQ9TD"), until
+  // another station is heard calling CQ here or the entry ages out.
+  if (std::string r = cqCall(hit->text, settings_.myCall); !r.empty()) hit->runner = r;
   skimDirty_ = true;
   labelSkimmed(hit->text, markHz);
   spotSkimmed(hit->text, markHz);
@@ -2075,8 +2093,13 @@ void MainWindow::labelSkimmed(const std::string& text, double markHz) {
   if (!settings_.skimmerWaterfallCalls) return;
   bool cq = false;
   const std::string recent = text.size() > 90 ? text.substr(text.size() - 90) : text;
-  std::string call = spottableCall(recent, settings_.myCall, &cq);   // the spot feed's rules: no noise
+  // The spot feed's rules: no noise. Marked as calling CQ only when it is the station
+  // calling, not one answering it on its frequency (issue #51).
+  const std::string runner = cqCall(recent, settings_.myCall);
+  std::string call = spottableCall(recent, settings_.myCall);
+  if (call.empty()) call = runner;
   if (call.empty()) return;
+  cq = !runner.empty() && call == runner;
   using K = Waterfall::LabelKind;
   std::string my = upper(settings_.myCall);
   K kind = K::Normal;
@@ -2119,15 +2142,22 @@ void MainWindow::openSpotServer() {
 // every few minutes unless it has moved.
 void MainWindow::spotSkimmed(const std::string& text, double markHz) {
   if ((!spotServer_.running() && !pskr_.isOpen()) || tx_.transmitting()) return;
-  bool cq = false;
   // Only the recent text: an earlier station on the same frequency is not spotted again.
-  std::string call = spottableCall(text.size() > 90 ? text.substr(text.size() - 90) : text, settings_.myCall, &cq);
-  if (call.empty()) return;
+  const std::string recent = text.size() > 90 ? text.substr(text.size() - 90) : text;
+  const std::string runner = cqCall(recent, settings_.myCall);
+  std::string heard = spottableCall(recent, settings_.myCall);
+  if (heard.empty()) heard = runner;
+  if (heard.empty()) return;
   double rf = audioMarkRadioFrequency(markHz);   // RTTY is spotted on its mark frequency
   if (rf <= 0) return;
   // PSK Reporter is public: report only frequencies read from the rig, not the manual dial.
-  if (rigState_.connected) pskr_.add(call, rf, "RTTY", static_cast<uint32_t>(g_get_real_time() / G_USEC_PER_SEC));
+  // It reports every station heard.
+  if (rigState_.connected) pskr_.add(heard, rf, "RTTY", static_cast<uint32_t>(g_get_real_time() / G_USEC_PER_SEC));
   if (!spotServer_.running()) return;
+  // The spot feed fills a logger's band map: by default only the stations calling CQ (issue #51).
+  const std::string call = settings_.spotServerCqOnly ? runner : heard;
+  if (call.empty()) return;
+  const bool cq = !runner.empty() && call == runner;
   int64_t now = g_get_monotonic_time();
   auto it = sentSpots_.find(call);
   if (it != sentSpots_.end() && now - it->second.at < 300 * G_USEC_PER_SEC && std::fabs(it->second.freqHz - rf) < 500) return;
@@ -2178,6 +2208,8 @@ void MainWindow::rebuildSkimList() {
   int64_t now = g_get_monotonic_time();
   for (size_t i = 0; i < skim_.size(); ++i) {
     const SkimEntry& s = skim_[i];
+    if (settings_.skimmerCqOnly && s.runner.empty()) continue;
+    const std::string& shownCall = settings_.skimmerCqOnly ? s.runner : s.call;
     const double rf = s.rfHz;
     const double markHz = radioFrequencyAudioMark(rf);
     const bool inAudio = markHz >= settings_.waterfallLoHz && markHz <= settings_.waterfallHiHz;
@@ -2190,7 +2222,7 @@ void MainWindow::rebuildSkimList() {
     gtk_widget_set_tooltip_text(freq, inAudio ? (std::to_string(static_cast<int>(std::lround(markHz))) + " Hz mark tone").c_str()
                                               : "Outside the receiver's audio since a QSY");
     gtk_box_append(GTK_BOX(top), freq);
-    GtkWidget* call = gtk_label_new(s.call.empty() ? "?" : s.call.c_str());
+    GtkWidget* call = gtk_label_new(shownCall.empty() ? "?" : shownCall.c_str());
     gtk_widget_add_css_class(call, "spot-call");
     gtk_label_set_xalign(GTK_LABEL(call), 0.f);
     gtk_widget_set_hexpand(call, TRUE);
@@ -2212,9 +2244,9 @@ void MainWindow::rebuildSkimList() {
     GtkWidget* row = gtk_list_box_row_new();
     gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), box);
     g_object_set_data(G_OBJECT(row), "skim-index", GINT_TO_POINTER(static_cast<int>(i)));
-    if (!s.call.empty() && log_.isOpen()) {
-      if (log_.isDupe(s.call, bandForFrequency(dialFreqHz()), "RTTY")) gtk_widget_add_css_class(row, "spot-dupe");
-      else if (log_.find(s.call).empty()) gtk_widget_add_css_class(row, "spot-new");
+    if (!shownCall.empty() && log_.isOpen()) {
+      if (log_.isDupe(shownCall, bandForFrequency(dialFreqHz()), "RTTY")) gtk_widget_add_css_class(row, "spot-dupe");
+      else if (log_.find(shownCall).empty()) gtk_widget_add_css_class(row, "spot-new");
     }
     gtk_widget_set_tooltip_text(row, inAudio ? "Click: tune the decoders to this signal and take the callsign"
                                              : "Click: QSY the rig onto this station and take the callsign");
@@ -2226,7 +2258,8 @@ void MainWindow::onSkimActivated(GtkListBox*, GtkListBoxRow* row, gpointer p) {
   auto* self = static_cast<MainWindow*>(p);
   int idx = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(row), "skim-index"));
   if (idx < 0 || idx >= static_cast<int>(self->skim_.size())) return;
-  const SkimEntry s = self->skim_[idx];
+  SkimEntry s = self->skim_[idx];
+  if (self->settings_.skimmerCqOnly && !s.runner.empty()) s.call = s.runner;   // the call the row shows
   const double markHz = self->radioFrequencyAudioMark(s.rfHz);
   if (markHz >= self->settings_.waterfallLoHz && markHz <= self->settings_.waterfallHiHz) {
     self->tuneToSkimmed(markHz, s.call);

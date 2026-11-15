@@ -188,12 +188,12 @@ This is for operating from gtty's own log row. When a contest logger drives gtty
 
 ## Skimmer spot feed
 
-With the [Skimmer](decoders.md#skimmer) on, gtty can serve what it hears as a telnet DX cluster, the way CW Skimmer does. A logger that connects gets a spot for every station the Skimmer identifies, so its band map shows the stations in your own receiver's passband, with dupes and multipliers marked by the logger.
+With the [Skimmer](decoders.md#skimmer) on, gtty can serve what it hears as a telnet DX cluster, the way CW Skimmer does. A logger that connects gets a spot for each station the Skimmer hears calling CQ, so its band map shows the stations running in your own receiver's passband, with dupes and multipliers marked by the logger.
 
 ### Setup
 
 1. Turn the Skimmer on (menu, or *Preferences → Decoders*).
-2. *Preferences → Integration → Skimmer spot feed*: tick **Serve skimmer spots**. The default address is 127.0.0.1, port 7300.
+2. *Preferences → Integration → Skimmer spot feed*: tick **Serve skimmer spots**. The default address is 127.0.0.1, port 7300. **Only stations calling CQ** is on by default; untick it to spot every station identified, callers included.
 3. In the logger, add a DX cluster at `127.0.0.1` port `7300`:
    - **TLF**: `TELNETHOST=127.0.0.1`, `TELNETPORT=7300` and `CLUSTERLOGIN=<your call>` in `logcfg.dat`, then `:CLUSTER` to show it.
    - **Not1MM**: the cluster server and port in its configuration, then the Cluster window's Connect button.
@@ -211,7 +211,9 @@ DX de WA8Q-#:    14083.5  DL1ABC       RTTY  45 BPS  CQ               1234Z
 - The frequency is the station's mark frequency, from the dial frequency, the sideband and the tone; it is only as good as the dial frequency gtty has. Without a rig connected, set *Preferences → Rig → Dial frequency without rig*.
 - The comment gives the mode and speed, and `CQ` when the station was calling CQ or TEST.
 
-A station is spotted when its callsign follows `DE` or `CQ`, or has been received twice, so that a callsign garbled by noise is not spotted. It is spotted again after five minutes, or sooner if it moves by more than 500 Hz. Your own callsign is never spotted, and nothing is spotted while you transmit.
+With **Only stations calling CQ** (the default), the station spotted is the one that goes with a `CQ` or `TEST`: `CQ TEST K5XOM K5XOM`, `CQ CQ DE K1ABC`, `TU DF7C CQ`. In a contest the callers answer on the runner's frequency, so the same Skimmer channel hears them too; they are not spotted, as on the Reverse Beacon Network. Unticked, any station is spotted.
+
+Either way a callsign is spotted only once it follows `DE`, `TU` or `CQ`, or has been received twice, so that a callsign garbled by noise is not spotted. It is spotted again after five minutes, or sooner if it moves by more than 500 Hz. Your own callsign is never spotted, and nothing is spotted while you transmit.
 
 A client that connects is asked to log in (`login:`); any callsign is accepted. It is then sent the last 40 spots, and `sh/dx` sends them again. Other cluster commands, such as filters, are accepted and ignored.
 

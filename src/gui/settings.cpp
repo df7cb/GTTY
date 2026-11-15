@@ -296,6 +296,7 @@ bool Settings::loadFrom(const std::string& path) {
   skimmerEnabled = boolean(kf, "decoders", "skimmer", skimmerEnabled);
   skimmerStepHz = dbl(kf, "decoders", "skimmer_step", skimmerStepHz);
   skimmerWaterfallCalls = boolean(kf, "decoders", "skimmer_waterfall_calls", skimmerWaterfallCalls);
+  skimmerCqOnly = boolean(kf, "decoders", "skimmer_cq_only", skimmerCqOnly);
   radioDecoderEnabled = boolean(kf, "decoders", "radio", radioDecoderEnabled);
   radioDecoderDevice = str(kf, "decoders", "radio_device", radioDecoderDevice);
   radioDecoderBaud = integer(kf, "decoders", "radio_baud", radioDecoderBaud);
@@ -366,6 +367,7 @@ bool Settings::loadFrom(const std::string& path) {
   spotServerEnabled = boolean(kf, "spots", "enabled", spotServerEnabled);
   spotServerBind = str(kf, "spots", "bind", spotServerBind);
   spotServerPort = integer(kf, "spots", "port", spotServerPort);
+  spotServerCqOnly = boolean(kf, "spots", "cq_only", spotServerCqOnly);
   pskReporterEnabled = boolean(kf, "pskreporter", "enabled", pskReporterEnabled);
   waterfallLoHz = dbl(kf, "display", "wf_lo", waterfallLoHz);
   waterfallHiHz = dbl(kf, "display", "wf_hi", waterfallHiHz);
@@ -428,6 +430,7 @@ bool Settings::saveTo(const std::string& path) const {
   g_key_file_set_boolean(kf, "decoders", "skimmer", skimmerEnabled);
   g_key_file_set_double(kf, "decoders", "skimmer_step", skimmerStepHz);
   g_key_file_set_boolean(kf, "decoders", "skimmer_waterfall_calls", skimmerWaterfallCalls);
+  g_key_file_set_boolean(kf, "decoders", "skimmer_cq_only", skimmerCqOnly);
   g_key_file_set_boolean(kf, "decoders", "radio", radioDecoderEnabled);
   g_key_file_set_string(kf, "decoders", "radio_device", radioDecoderDevice.c_str());
   g_key_file_set_integer(kf, "decoders", "radio_baud", radioDecoderBaud);
@@ -498,6 +501,7 @@ bool Settings::saveTo(const std::string& path) const {
   g_key_file_set_boolean(kf, "spots", "enabled", spotServerEnabled);
   g_key_file_set_string(kf, "spots", "bind", spotServerBind.c_str());
   g_key_file_set_integer(kf, "spots", "port", spotServerPort);
+  g_key_file_set_boolean(kf, "spots", "cq_only", spotServerCqOnly);
   g_key_file_set_boolean(kf, "pskreporter", "enabled", pskReporterEnabled);
   g_key_file_set_double(kf, "display", "wf_lo", waterfallLoHz);
   g_key_file_set_double(kf, "display", "wf_hi", waterfallHiHz);

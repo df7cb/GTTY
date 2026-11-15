@@ -38,7 +38,7 @@ struct Prefs {
   GtkWidget *rxTimestamps, *rxLogToFile, *rxLogDir;
   GtkWidget *rpcEnabled, *rpcBind, *rpcPort;
   GtkWidget *fllogEnabled, *fllogHost, *fllogPort;
-  GtkWidget *spotEnabled, *spotBind, *spotPort;
+  GtkWidget *spotEnabled, *spotCqOnly, *spotBind, *spotPort;
   GtkWidget* pskrEnabled;
   GtkWidget *myCall, *myName, *myQth, *myGrid;
   GtkWidget *scpPath, *logPath, *wfLo, *wfHi, *wfDir, *fontSize, *theme, *modemOnly;
@@ -193,6 +193,7 @@ void onClosed(AdwDialog*, gpointer p) {
   s.fllogHost = text(pr->fllogHost);
   s.fllogPort = static_cast<int>(value(pr->fllogPort));
   s.spotServerEnabled = active(pr->spotEnabled);
+  s.spotServerCqOnly = active(pr->spotCqOnly);
   s.spotServerBind = text(pr->spotBind);
   s.spotServerPort = static_cast<int>(value(pr->spotPort));
   s.pskReporterEnabled = active(pr->pskrEnabled);
@@ -501,6 +502,8 @@ void showPrefsDialog(GtkWidget* parent, Settings& s, std::function<void()> onApp
     GtkWidget* g5 = group(pg, "Skimmer spot feed (telnet)");
     pr->spotEnabled = toggle(g5, "Serve skimmer spots", s.spotServerEnabled,
                              "Loggers connect as to a DX cluster and get a spot for every station the Skimmer identifies. Needs the Skimmer on");
+    pr->spotCqOnly = toggle(g5, "Only stations calling CQ", s.spotServerCqOnly,
+                            "What a band map wants, and what the Reverse Beacon Network spots: not the stations answering them");
     pr->spotBind = entry(g5, "Bind address", s.spotServerBind);
     pr->spotPort = spin(g5, "Port", 1, 65535, 1, s.spotServerPort);
     GtkWidget* g6 = group(pg, "PSK Reporter");

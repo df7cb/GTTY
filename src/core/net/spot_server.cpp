@@ -87,6 +87,51 @@ std::string spottableCall(const std::string& text, const std::string& myCall, bo
   return best;
 }
 
+std::string cqCall(const std::string& text, const std::string& myCall) {
+  std::string t = upper(text);
+  for (auto& c : t)
+    if (c == '\r' || c == '\n' || c == '\t') c = ' ';
+  const std::string my = upper(myCall);
+  struct Word { size_t pos; std::string w; bool call; };
+  std::vector<Word> words;
+  for (size_t i = 0; i < t.size();) {
+    if (t[i] == ' ') { ++i; continue; }
+    size_t e = t.find(' ', i);
+    if (e == std::string::npos) e = t.size();
+    words.push_back({i, t.substr(i, e - i), false});
+    i = e;
+  }
+  const auto spans = findCallsigns(t);
+  for (auto& w : words)
+    for (const auto& [pos, len] : spans)
+      if (pos == w.pos && len == w.w.size()) w.call = true;
+  auto times = [&](const std::string& c) {
+    return std::count_if(words.begin(), words.end(), [&](const Word& w) { return w.w == c; });
+  };
+  // Complete (not the word still arriving), not ourselves, and announced.
+  auto usable = [&](size_t i, const char* announcedBy) {
+    const Word& w = words[i];
+    if (!w.call || w.w == my || w.pos + w.w.size() == t.size()) return false;
+    return (i > 0 && words[i - 1].w == announcedBy) || times(w.w) >= 2;
+  };
+  auto isCq = [](const std::string& w) { return w == "CQ" || w == "TEST"; };
+  std::string best;
+  for (size_t i = 0; i < words.size(); ++i) {
+    if (!isCq(words[i].w)) continue;
+    std::string found;
+    // After it: "CQ TEST K5XOM", "CQ CQ DE K1ABC", "CQ WAE N8CWU": the first call within a few words.
+    for (size_t j = i + 1; j < words.size() && j <= i + 4; ++j) {
+      if (isCq(words[j].w) || words[j].w == "DE" || !words[j].call) continue;
+      if (usable(j, "DE")) found = words[j].w;
+      break;
+    }
+    // Before it: the runner's "TU DF7C CQ".
+    if (found.empty() && i > 0 && usable(i - 1, "TU")) found = words[i - 1].w;
+    if (!found.empty()) best = found;
+  }
+  return best;
+}
+
 SpotServer::~SpotServer() { stop(); }
 
 bool SpotServer::start(const std::string& bindAddr, uint16_t port, const std::string& spotter, std::string& err) {
