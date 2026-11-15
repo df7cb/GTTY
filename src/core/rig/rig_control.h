@@ -1,6 +1,7 @@
 // Thread-safe Hamlib wrapper with a background poller for frequency/mode.
 #pragma once
 #include <atomic>
+#include <chrono>
 #include <functional>
 #include <mutex>
 #include <string>
@@ -39,8 +40,36 @@ struct RigState {
   double freqHz = 0;
   std::string mode;
   int widthHz = 0;
+  // Set in one poll only: the filter width that was asked for and that the rig did not
+  // take. widthHz is what the rig has instead.
+  int widthRefusedHz = 0;
   bool ptt = false;
   std::string error;
+};
+
+// Checks that a filter width that was set is the one the rig ends up with. Hamlib reports
+// success whether or not the radio took the width, and for a while afterwards it (and a
+// rigctld in between) answers from its cache with the width that was asked for. So the
+// answer is only believed once that cache has expired.
+class WidthCheck {
+ public:
+  using Clock = std::chrono::steady_clock;
+  static constexpr std::chrono::milliseconds kSettle{1500};
+
+  void asked(int hz, Clock::time_point now) { askedHz_ = hz; due_ = now + kSettle; }
+  void cancel() { askedHz_ = 0; }
+  // Call with each width read from the rig (0 = not known). Returns the width asked for
+  // when the rig has settled on a different one, once; 0 otherwise.
+  int polled(int reportedHz, Clock::time_point now) {
+    if (askedHz_ <= 0 || now < due_) return 0;
+    int asked = askedHz_;
+    askedHz_ = 0;
+    return reportedHz > 0 && reportedHz != asked ? asked : 0;
+  }
+
+ private:
+  int askedHz_ = 0;
+  Clock::time_point due_{};
 };
 
 class RigControl {
@@ -70,7 +99,9 @@ class RigControl {
   // mode: Hamlib mode name (RTTY, RTTYR, USB, LSB, PKTUSB ...). width -1 = no change.
   bool setMode(const std::string& mode, int widthHz = -1);
   bool setPtt(bool on);
-  // Receiver filter: passband width in Hz for the current mode (rig_set_mode).
+  // Receiver filter: passband width in Hz for the current mode (rig_set_mode). True means
+  // only that the command went out: a rig that then stays on another width is reported
+  // by the poller in RigState::widthRefusedHz.
   bool setWidth(int hz);
   // IF shift in Hz (RIG_LEVEL_IF); hasIfShift() tells whether the backend supports it.
   bool setIfShift(int hz);
@@ -95,6 +126,7 @@ class RigControl {
   RigConfig cfg_;
   mutable std::mutex mu_;      // guards rig_ calls and state_
   RigState state_;
+  WidthCheck widthCheck_;
   std::thread poller_;
   std::atomic<bool> run_{false};
 };

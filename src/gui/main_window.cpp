@@ -14,6 +14,7 @@
 #include "core/log/grid.h"
 #include "core/version.h"
 #include "prefs_dialog.h"
+#include "text_append.h"
 
 
 namespace gtty {
@@ -361,6 +362,7 @@ GtkWidget* MainWindow::buildRxPanes() {
     echoTags_[i] = gtk_text_buffer_create_tag(buf, nullptr, "foreground", "#d03030", nullptr);
     timeTags_[i] = gtk_text_buffer_create_tag(buf, nullptr, "foreground", "#8a8a8a", "scale", 0.85, nullptr);
     rxViews_[i] = view; rxBufs_[i] = buf;
+    keepSelectionOnAppend(buf);
 
     GtkGesture* click = gtk_gesture_click_new();
     g_signal_connect(click, "pressed", G_CALLBACK(onRxClicked), this);
@@ -1021,6 +1023,9 @@ void MainWindow::handle(const Event& e) {
     bool wasConnected = rigState_.connected;
     rigState_ = rs->state;
     updateFreqDisplay(rigState_);
+    if (rigState_.widthRefusedHz > 0)
+      toast("Rig filter is " + std::to_string(rigState_.widthHz) + " Hz, not the " +
+            std::to_string(rigState_.widthRefusedHz) + " Hz asked for");
     updateWaterfallDirection();
     // The rig changed sideband (or came, or went): the tones follow it.
     if (sidebandSwap() != sidebandSwapped_) {
@@ -1117,16 +1122,14 @@ void MainWindow::appendRx(int slot, const std::string& text) {
       if (rxTextLog_.size() > (8u << 20)) rxTextLog_.erase(0, 4u << 20);
       sessionWrite(std::string(1, c), false);
     }
-    GtkTextIter end;
+    // A selection that reaches the end of the text must not grow with what arrives.
     if (rxLineStart_[slot] && c != '\n' && settings_.rxTimestamps) {
       std::string stamp = "[" + Logbook::nowUtc().substr(11, 8) + "] ";
-      gtk_text_buffer_get_end_iter(buf, &end);
-      gtk_text_buffer_insert_with_tags(buf, &end, stamp.c_str(), -1, timeTags_[slot], nullptr);
+      appendKeepingSelection(buf, stamp.c_str(), -1, timeTags_[slot]);
     }
     rxLineStart_[slot] = (c == '\n');
-    gtk_text_buffer_get_end_iter(buf, &end);
     char s[2] = {c, 0};
-    gtk_text_buffer_insert(buf, &end, s, 1);
+    appendKeepingSelection(buf, s, 1);
     if (std::isalnum(static_cast<unsigned char>(c)) || c == '/') {
       word.push_back(c);
     } else {
@@ -1172,12 +1175,10 @@ void MainWindow::appendEcho(const std::string& text) {
   if (t.empty()) return;
   // Every pane shows what was sent, so the exchange reads in order whichever one is watched.
   for (size_t i = 0; i < rxBufs_.size(); ++i) {
-    GtkTextIter end;
-    gtk_text_buffer_get_end_iter(rxBufs_[i], &end);
     rxLineStart_[i] = (t.back() == '\n');
     rxWord_[i].clear();   // a received word does not continue through what was sent
     rxHighlight_[i].newLine();
-    gtk_text_buffer_insert_with_tags(rxBufs_[i], &end, t.c_str(), -1, echoTags_[i], nullptr);
+    appendKeepingSelection(rxBufs_[i], t.c_str(), -1, echoTags_[i]);
     gtk_text_view_scroll_mark_onscreen(GTK_TEXT_VIEW(rxViews_[i]), rxEndMarks_[i]);
   }
 }
@@ -2359,9 +2360,7 @@ void MainWindow::onTxEnded() {
   bool ended = false;
   for (size_t i = 0; i < rxBufs_.size(); ++i) {
     if (rxLineStart_[i]) continue;
-    GtkTextIter end;
-    gtk_text_buffer_get_end_iter(rxBufs_[i], &end);
-    gtk_text_buffer_insert(rxBufs_[i], &end, "\n", 1);
+    appendKeepingSelection(rxBufs_[i], "\n", 1);
     rxLineStart_[i] = true;
     if (i == 0) ended = true;
   }

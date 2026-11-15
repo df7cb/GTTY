@@ -104,6 +104,7 @@ void RigControl::closeRig() {
     rig_cleanup(rig_);
     rig_ = nullptr;
   }
+  widthCheck_.cancel();
   state_ = RigState{};
 }
 
@@ -124,9 +125,11 @@ void RigControl::pollLoop() {
         else setError(rigerror2(rc));
         rmode_t m = RIG_MODE_NONE;
         pbwidth_t w = 0;
+        state_.widthRefusedHz = 0;
         if (rig_get_mode(rig_, RIG_VFO_CURR, &m, &w) == RIG_OK) {
           state_.mode = rig_strrmode(m);
           state_.widthHz = static_cast<int>(w);
+          state_.widthRefusedHz = widthCheck_.polled(state_.widthHz, WidthCheck::Clock::now());
         }
         ptt_t p = RIG_PTT_OFF;
         if (pttPort_.isOpen()) state_.ptt = pttPort_.get();
@@ -182,7 +185,13 @@ bool RigControl::setWidth(int hz) {
   int rc = rig_get_mode(rig_, RIG_VFO_CURR, &m, &w);
   if (rc != RIG_OK) { setError(rigerror2(rc)); return false; }
   rc = rig_set_mode(rig_, RIG_VFO_CURR, m, hz);
-  if (rc == RIG_OK) state_.widthHz = hz; else setError(rigerror2(rc));
+  if (rc == RIG_OK) {
+    state_.widthHz = hz;
+    widthCheck_.asked(hz, WidthCheck::Clock::now());
+  } else {
+    setError(rigerror2(rc));
+    widthCheck_.cancel();
+  }
   return rc == RIG_OK;
 }
 
