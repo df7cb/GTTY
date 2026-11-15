@@ -65,6 +65,7 @@ MainWindow::MainWindow(AdwApplication* app)
   openGridTracker();
   openRpc();
   openSpotServer();
+  openPskReporter();
   openSessionLog();
   openCluster();
   setBandMapVisible(settings_.bandMapVisible);
@@ -79,6 +80,7 @@ MainWindow::MainWindow(AdwApplication* app)
 MainWindow::~MainWindow() {
   rpc_.stop();
   spotServer_.stop();
+  pskr_.close(static_cast<uint32_t>(g_get_real_time() / G_USEC_PER_SEC));
   fllog_.stop();
   cluster_.stop();
   if (callLookupId_) g_source_remove(callLookupId_);
@@ -950,6 +952,7 @@ gboolean MainWindow::onTick(gpointer p) {
 void MainWindow::poll() {
   tx_.tick();
   gtTick();
+  pskr_.tick(static_cast<uint32_t>(g_get_real_time() / G_USEC_PER_SEC));
   Event e;
   int budget = 200;
   while (budget-- > 0 && events_.pop(e)) handle(e);
@@ -1146,6 +1149,7 @@ void MainWindow::appendRx(int slot, const std::string& text) {
       rxTextLog_.push_back(c);
       if (rxTextLog_.size() > (8u << 20)) rxTextLog_.erase(0, 4u << 20);
       sessionWrite(std::string(1, c), false);
+      pskReportRx(c);
     }
     // A selection that reaches the end of the text must not grow with what arrives.
     if (rxLineStart_[slot] && c != '\n' && settings_.rxTimestamps) {
@@ -1702,6 +1706,7 @@ void MainWindow::applySettings() {
   openGridTracker();
   openRpc();
   openSpotServer();
+  openPskReporter();
   openSessionLog();
   openCluster();
   setBandMapVisible(settings_.bandMapVisible);
@@ -2023,13 +2028,16 @@ void MainWindow::openSpotServer() {
 // `text` is what one skimmer channel has decoded lately. Spot the station it names, once
 // every few minutes unless it has moved.
 void MainWindow::spotSkimmed(const std::string& text, double markHz) {
-  if (!spotServer_.running() || tx_.transmitting()) return;
+  if ((!spotServer_.running() && !pskr_.isOpen()) || tx_.transmitting()) return;
   bool cq = false;
   // Only the recent text: an earlier station on the same frequency is not spotted again.
   std::string call = spottableCall(text.size() > 90 ? text.substr(text.size() - 90) : text, settings_.myCall, &cq);
   if (call.empty()) return;
   double rf = audioMarkRadioFrequency(markHz);   // RTTY is spotted on its mark frequency
   if (rf <= 0) return;
+  // PSK Reporter is public: report only frequencies read from the rig, not the manual dial.
+  if (rigState_.connected) pskr_.add(call, rf, "RTTY", static_cast<uint32_t>(g_get_real_time() / G_USEC_PER_SEC));
+  if (!spotServer_.running()) return;
   int64_t now = g_get_monotonic_time();
   auto it = sentSpots_.find(call);
   if (it != sentSpots_.end() && now - it->second.at < 300 * G_USEC_PER_SEC && std::fabs(it->second.freqHz - rf) < 500) return;
@@ -2038,6 +2046,30 @@ void MainWindow::spotSkimmed(const std::string& text, double markHz) {
   char comment[40];
   snprintf(comment, sizeof comment, "RTTY  %d BPS%s", static_cast<int>(std::lround(settings_.rtty.baud)), cq ? "  CQ" : "");
   spotServer_.spot(call, rf, comment);
+}
+
+// ------------------------------------------------------------- PSK Reporter
+
+void MainWindow::openPskReporter() {
+  pskr_.close(static_cast<uint32_t>(g_get_real_time() / G_USEC_PER_SEC));
+  pskrRxText_.clear();
+  if (!settings_.pskReporterEnabled) return;
+  PskReceiverInfo rx{upper(settings_.myCall), settings_.myGrid, std::string("gtty ") + gtty::version()};
+  std::string err;
+  if (!pskr_.open(rx, err)) toast("PSK Reporter: " + err);
+}
+
+// One character from the primary decoder. At each word boundary, report the station the
+// recent text identifies, by the same rules as the Skimmer's spots.
+void MainWindow::pskReportRx(char c) {
+  if (!pskr_.isOpen() || !rigState_.connected) return;   // see spotSkimmed()
+  pskrRxText_.push_back(c == '\n' || c == '\r' ? ' ' : c);
+  if (pskrRxText_.size() > 90) pskrRxText_.erase(0, pskrRxText_.size() - 90);
+  if (pskrRxText_.back() != ' ' || tx_.transmitting()) return;
+  std::string call = spottableCall(pskrRxText_, settings_.myCall);
+  if (call.empty()) return;
+  double rf = audioMarkRadioFrequency(activeRtty().markFreq + primaryAfc_);
+  if (rf > 0) pskr_.add(call, rf, "RTTY", static_cast<uint32_t>(g_get_real_time() / G_USEC_PER_SEC));
 }
 
 void MainWindow::ageSkim() {

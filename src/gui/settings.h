@@ -129,6 +129,8 @@ struct Settings {
   bool spotServerEnabled = false;
   std::string spotServerBind = "127.0.0.1";
   int spotServerPort = 7300;
+  // Report decoded stations to PSK Reporter (needs myCall and myGrid)
+  bool pskReporterEnabled = false;
   // DX cluster / band map
   bool clusterEnabled = false;
   std::string clusterHost;

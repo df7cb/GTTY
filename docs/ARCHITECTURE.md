@@ -95,6 +95,16 @@ form, so the GUI shapes each heard callsign into a WSJT-X-looking message
 grids are picked up from the same RTTY line when present. Non-blocking UDP
 socket polled from the GTK tick; no extra thread.
 
+## PSK Reporter (src/core/net/psk_reporter.cpp)
+
+IPFIX (RFC 7011) over UDP as described at pskreporter.info/pskdev.html: a
+receiver options template (callsign, locator, software) and a sender template
+(callsign, frequency, mode, information source, flowStartSeconds), sent in the
+first three batches and hourly after. Spots are de-duplicated per call and MHz
+for five minutes and batched every five minutes, split to stay under 1400
+bytes. The GTK tick drives it; the host is resolved on a detached thread so a
+slow resolver never blocks the UI.
+
 ## fldigi-compatible XML-RPC (src/core/net/xmlrpc_server.cpp)
 
 A small HTTP/1.1 server with a hand-written XML-RPC parser and serializer

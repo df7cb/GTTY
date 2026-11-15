@@ -365,6 +365,7 @@ bool Settings::loadFrom(const std::string& path) {
   spotServerEnabled = boolean(kf, "spots", "enabled", spotServerEnabled);
   spotServerBind = str(kf, "spots", "bind", spotServerBind);
   spotServerPort = integer(kf, "spots", "port", spotServerPort);
+  pskReporterEnabled = boolean(kf, "pskreporter", "enabled", pskReporterEnabled);
   waterfallLoHz = dbl(kf, "display", "wf_lo", waterfallLoHz);
   waterfallHiHz = dbl(kf, "display", "wf_hi", waterfallHiHz);
   waterfallDirection = integer(kf, "display", "wf_direction", waterfallDirection);
@@ -495,6 +496,7 @@ bool Settings::saveTo(const std::string& path) const {
   g_key_file_set_boolean(kf, "spots", "enabled", spotServerEnabled);
   g_key_file_set_string(kf, "spots", "bind", spotServerBind.c_str());
   g_key_file_set_integer(kf, "spots", "port", spotServerPort);
+  g_key_file_set_boolean(kf, "pskreporter", "enabled", pskReporterEnabled);
   g_key_file_set_double(kf, "display", "wf_lo", waterfallLoHz);
   g_key_file_set_double(kf, "display", "wf_hi", waterfallHiHz);
   g_key_file_set_integer(kf, "display", "wf_direction", waterfallDirection);
