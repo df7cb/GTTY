@@ -148,6 +148,7 @@ class MainWindow {
   void updateRigControls();
   static void onSpotActivated(GtkListBox*, GtkListBoxRow* row, gpointer self);
   static void onFilterNotify(GObject*, GParamSpec*, gpointer self);
+  static void onShiftTonesChosen(GObject*, GParamSpec*, gpointer self);
   static void onIfShiftChanged(GtkSpinButton* s, gpointer self);
   static void onTuneToggled(GtkToggleButton* b, gpointer self);
   static gboolean onCallLookupTimeout(gpointer self);
@@ -322,6 +323,7 @@ class MainWindow {
   GtkWidget* baudDrop_ = nullptr;
   GtkWidget* shiftDrop_ = nullptr;
   GtkWidget* tonesDrop_ = nullptr;
+  GtkWidget* shiftTonesPop_ = nullptr;   // the menu Shift and Tones sit in
   GtkWidget* callEntry_ = nullptr;
   GtkWidget* rstSEntry_ = nullptr;
   GtkWidget* rstREntry_ = nullptr;
