@@ -50,6 +50,10 @@ int tonePresetIndex(double mark, double space) {
   const auto& v = tonePresets();
   for (size_t i = 1; i < v.size(); ++i)
     if (v[i].mark == mark && v[i].space == space) return static_cast<int>(i);
+  // A normal-polarity preset with Rev ticked is still that tone pair: name it, rather
+  // than show "Custom" the moment Rev is used. The Rev box says which way round it is.
+  for (size_t i = 1; i < v.size(); ++i)
+    if (v[i].space > v[i].mark && v[i].mark == space && v[i].space == mark) return static_cast<int>(i);
   return 0;
 }
 

@@ -27,6 +27,8 @@ The default tones, mark below space, are how an RTTY signal sounds with the rece
 
 With rig control on, gtty follows the rig: while it reports **USB** or **PKTUSB**, mark and space are exchanged for receive and transmit, and a notice says so. The tone pair on the waterfall stays where it is; only the roles of the two tones change. **Rev** is then left for a station that sends reversed. This is what Fldigi does, so the same Rev setting works in both. The rig's own reverse mode (RTTY-R) is not followed, since that is a choice made on the radio. Turn the behavior off with *Preferences → RTTY → Follow the rig's sideband*.
 
+**Rev** exchanges mark and space where they are: the tone pair, and a signal tuned in on it, stay put, and the **Tones** preset keeps its name.
+
 Without rig control gtty cannot know the sideband and assumes the lower one: tick **Rev** yourself when the rig is in USB. If a strong, well tuned signal prints garbage, Rev is the first thing to try.
 
 ## The waterfall

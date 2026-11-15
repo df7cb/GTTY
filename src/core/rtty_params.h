@@ -34,6 +34,12 @@ struct RttyParams {
     p.setTones(spaceFreq(), markFreq);
     return p;
   }
+  // Reverse the polarity, or put it back: mark and space change places and the pair
+  // stays where it is, so a signal tuned in stays tuned in. (Setting `reverse` alone
+  // would keep mark and move space to its other side, a shift's width off the signal.)
+  void setReversed(bool r) {
+    if (r != reverse) *this = swappedTones();
+  }
   double centerFreq() const { return (markFreq + spaceFreq()) / 2.0; }
   double bitPeriod() const { return 1.0 / baud; }
   // Start bit + 5 data + stop bits.
