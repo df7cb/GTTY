@@ -1,0 +1,4 @@
+describe: $Format:%(describe:tags=true,match=v[0-9]*)$
+commit: $Format:%h$
+date: $Format:%cs$
+date-rfc: $Format:%cD$

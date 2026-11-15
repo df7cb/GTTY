@@ -52,6 +52,21 @@ An AddressSanitizer build is a separate build directory, for example `cmake -S .
 
 Locally: `cd build && cpack -G DEB` makes a `.deb`; `packaging/build-appimage.sh` makes an AppImage.
 
+## Version numbers
+
+No version number is written in the sources. Every build takes its version from git (`cmake/GttyVersion.cmake`) and reports it in the About dialog, `gtty --version`, `gtty-cli --version`, the XML-RPC `fldigi.version` call, the WSJT-X heartbeat sent to GridTracker, both man pages, the package version and the AppStream metadata:
+
+| Built from | Reported version | Package version |
+|---|---|---|
+| The tag `v0.2.8` | `0.2.8` | `0.2.8` |
+| Three commits after it | `0.2.8-3-g1a2b3c4` | `0.2.8+3.g1a2b3c4` |
+| A checkout that cannot see any tag (a shallow clone) | `1a2b3c4` | `0.0.0+g1a2b3c4` |
+| A tree with uncommitted changes | any of the above with `-dirty` | with `+dirty` or `.dirty` |
+
+To release, tag the commit `vMAJOR.MINOR.PATCH` and push the tag; nothing else needs editing. The version is checked again on every build, so a build made after a new commit or tag picks it up.
+
+A source tarball made by `git archive` or downloaded from GitHub carries its version in `.git_archival.txt`. Where neither git nor that file is available, set `GTTY_VERSION_OVERRIDE` (a `-D` option to CMake or an environment variable) to the version to report.
+
 ## Tuning the decoders on your own recordings
 
 `tools/bench_rtty.py` decodes recordings with known content and reports the character error rate per engine.

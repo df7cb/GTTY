@@ -18,6 +18,6 @@
   <content_rating type="oars-1.1"/>
   <provides><binary>gtty</binary><binary>gtty-cli</binary></provides>
   <releases>
-    <release version="0.1.0" date="2026-11-08"/>
+    <release version="@GTTY_VERSION_PACKAGE@" date="@GTTY_VERSION_DATE@"/>
   </releases>
 </component>

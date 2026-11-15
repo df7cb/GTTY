@@ -1,8 +1,9 @@
-.TH GTTY 1 "November 2026" "gtty 0.1.0" "User Commands"
+.TH GTTY 1 "@GTTY_VERSION_MAN_DATE@" "gtty @GTTY_VERSION@" "User Commands"
 .SH NAME
 gtty \- amateur radio RTTY terminal
 .SH SYNOPSIS
 .B gtty
+.RB [ \-\-version ]
 .SH DESCRIPTION
 .B gtty
 is a GTK4 RTTY terminal for amateur radio. It decodes Baudot RTTY from a sound
@@ -25,6 +26,10 @@ Station aids: a DX cluster band map with click-to-QSY, callbook lookup
 (QRZ.com XML or HamQTH) with worked-before information from the logbook,
 rig receiver filter width and IF shift controls, a Tune button, a CW
 identifier and a TX monitor for FSK keying. All are set up in Preferences.
+.SH OPTIONS
+.TP
+.B \-\-version
+Print the version (the git tag the program was built from, or the tag and commit) and exit.
 .SH KEYS
 .TP
 .B F1 .. F12

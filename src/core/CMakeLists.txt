@@ -1,5 +1,6 @@
 add_library(gttycore STATIC
   baudot.cpp
+  version.cpp
   dsp/resampler.cpp
   dsp/spectrum.cpp
   modem/rtty_modulator.cpp
@@ -47,3 +48,7 @@ if(CURL_FOUND)
   target_link_libraries(gttycore PUBLIC PkgConfig::CURL)
   target_compile_definitions(gttycore PRIVATE GTTY_HAVE_CURL=1)
 endif()
+
+# version.cpp includes the header the gtty_version target writes from git.
+target_include_directories(gttycore PRIVATE ${GTTY_GENERATED_DIR})
+add_dependencies(gttycore gtty_version)

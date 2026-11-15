@@ -1,0 +1,6 @@
+gtty (@GTTY_VERSION_PACKAGE@) unstable; urgency=medium
+
+  * Release @GTTY_VERSION@. The changes in each release are listed at
+    https://github.com/gjyoung1974/GTTY/releases
+
+ -- Gordon Young <gjyoung1974@gmail.com>  @GTTY_VERSION_DATE_RFC@

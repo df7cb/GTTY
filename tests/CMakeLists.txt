@@ -55,3 +55,7 @@ if(Python3_FOUND AND TARGET gtty)
     SKIP_RETURN_CODE 77 TIMEOUT 400 LABELS integration
     ENVIRONMENT "GTTY_CTEST=1;GTTY_BIN=$<TARGET_FILE:gtty>;GTTY_CLI=$<TARGET_FILE:gtty-cli>")
 endif()
+
+# The version every build reports is derived from git; see cmake/GttyVersion.cmake.
+add_test(NAME version_detection
+  COMMAND ${CMAKE_COMMAND} -DMOD=${CMAKE_SOURCE_DIR}/cmake/GttyVersion.cmake -P ${CMAKE_CURRENT_SOURCE_DIR}/version_detect_test.cmake)
