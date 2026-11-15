@@ -108,5 +108,13 @@ int main() {
   Profiles::setCurrent("Gone");
   CHECK_EQ(Profiles::current(), std::string("Default"));
 
+
+  // Tone presets: an exact match, a normal preset with Rev ticked, and anything else.
+  CHECK_EQ(tonePresetIndex(2125, 2295), 1);
+  CHECK_EQ(tonePresetIndex(2295, 2125), 1);   // the standard pair, reversed with the Rev box
+  CHECK_EQ(tonePresetIndex(2125, 1955), 2);
+  CHECK_EQ(tonePresetIndex(1955, 2125), 0);   // not a preset: Custom
+  CHECK_EQ(tonePresetIndex(1000, 1170), 0);
+
   TEST_MAIN_END();
 }

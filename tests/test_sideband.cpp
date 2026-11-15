@@ -27,6 +27,20 @@ int main() {
   CHECK(!rev.swappedTones().reverse);
   CHECK_EQ(lsb.swappedTones().swappedTones().markFreq, lsb.markFreq);
   CHECK(!lsb.swappedTones().swappedTones().reverse);
+  // The Rev box: mark and space change places, the pair stays put (issue #21: it used to
+  // keep mark and move space to the other side, 170 Hz off the signal).
+  RttyParams box = lsb;                 // 2125 mark, 2295 space
+  box.setReversed(true);
+  CHECK(box.reverse);
+  CHECK_EQ(box.markFreq, 2295.0);
+  CHECK_EQ(box.spaceFreq(), 2125.0);
+  CHECK_EQ(box.centerFreq(), lsb.centerFreq());
+  box.setReversed(true);                // already reversed: nothing moves
+  CHECK_EQ(box.markFreq, 2295.0);
+  box.setReversed(false);
+  CHECK(!box.reverse);
+  CHECK_EQ(box.markFreq, 2125.0);
+  CHECK_EQ(box.spaceFreq(), 2295.0);
   // Baud, stop bits and the rest are untouched.
   RttyParams wide;
   wide.baud = 50;

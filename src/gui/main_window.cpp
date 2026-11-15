@@ -620,8 +620,9 @@ GtkWidget* MainWindow::buildControlRow() {
   };
   afcCheck_ = check("AFC", "Automatic frequency control");
   atcCheck_ = check("ATC", "Automatic threshold control");
-  revCheck_ = check("Rev", "Reverse mark and space, for a station that sends reversed. Unticked (default): space above mark, 2125 / 2295, "
-                           "as heard on the lower sideband; with the rig in USB the two are swapped automatically (Preferences → RTTY)");
+  revCheck_ = check("Rev", "Exchange mark and space, for a station that sends reversed; the tone pair stays where it is. "
+                           "Unticked (default): space above mark, 2125 / 2295, as heard on the lower sideband; "
+                           "with the rig in USB the two are swapped automatically (Preferences → RTTY)");
   netCheck_ = check("Net", "Transmit on the AFC-tracked receive tones");
   autoRxCheck_ = check("Auto RX", "Return to receive automatically after the TX buffer empties (delay in Preferences)");
   autoCqCheck_ = gtk_check_button_new_with_label("Auto CQ");
@@ -885,7 +886,7 @@ void MainWindow::onControlChanged(GtkWidget*, gpointer p) {
   if (self->suppressControlEvents_) return;
   self->settings_.afc = gtk_check_button_get_active(GTK_CHECK_BUTTON(self->afcCheck_));
   self->settings_.atc = gtk_check_button_get_active(GTK_CHECK_BUTTON(self->atcCheck_));
-  self->settings_.rtty.reverse = gtk_check_button_get_active(GTK_CHECK_BUTTON(self->revCheck_));
+  self->settings_.rtty.setReversed(gtk_check_button_get_active(GTK_CHECK_BUTTON(self->revCheck_)));
   self->settings_.netTx = gtk_check_button_get_active(GTK_CHECK_BUTTON(self->netCheck_));
   self->settings_.autoRx = gtk_check_button_get_active(GTK_CHECK_BUTTON(self->autoRxCheck_));
   self->settings_.squelch = static_cast<float>(gtk_range_get_value(GTK_RANGE(self->squelchScale_)));
@@ -2447,7 +2448,7 @@ xmlrpc::Value MainWindow::rpcDispatch(const std::string& m, const std::vector<xm
   if (m == "main.get_reverse") return V::boolean(settings_.rtty.reverse);
   if (m == "main.set_reverse" || m == "main.toggle_reverse") {
     bool old = settings_.rtty.reverse;
-    settings_.rtty.reverse = m == "main.toggle_reverse" ? !old : arg(0).asBool();
+    settings_.rtty.setReversed(m == "main.toggle_reverse" ? !old : arg(0).asBool());
     applyRttyParams(true); syncControlsFromSettings();
     return V::boolean(old);
   }
