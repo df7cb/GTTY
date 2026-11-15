@@ -41,6 +41,16 @@ struct RttyParams {
     if (r != reverse) *this = swappedTones();
   }
   double centerFreq() const { return (markFreq + spaceFreq()) / 2.0; }
+  // The stored tones that put the mark *in use* on `audioMarkHz`, keeping shift and
+  // polarity, when the tones in use are these with mark and space `swapped` (following
+  // the rig's upper sideband). A signal found on the waterfall or by the Skimmer is in
+  // the tones in use; storing its mark directly would land a shift away when swapped.
+  RttyParams withMarkInUse(double audioMarkHz, bool swapped) const {
+    RttyParams inUse = swapped ? swappedTones() : *this;
+    const double toSpace = inUse.spaceFreq() - inUse.markFreq;
+    inUse.setTones(audioMarkHz, audioMarkHz + toSpace);
+    return swapped ? inUse.swappedTones() : inUse;
+  }
   double bitPeriod() const { return 1.0 / baud; }
   // Start bit + 5 data + stop bits.
   double charPeriod() const { return (1.0 + 5.0 + stopBits) / baud; }

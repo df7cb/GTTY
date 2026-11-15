@@ -2044,7 +2044,7 @@ void MainWindow::labelSkimmed(const std::string& text, double markHz) {
 
 // Tune the decoders to a skimmed station and take its callsign (Skimmer list or waterfall label).
 void MainWindow::tuneToSkimmed(double markHz, const std::string& call) {
-  settings_.rtty.markFreq = std::round(markHz);
+  settings_.rtty = settings_.rtty.withMarkInUse(std::round(markHz), sidebandSwap());
   applyRttyParams(true);
   syncControlsFromSettings();
   if (!call.empty() && !tx_.transmitting()) {

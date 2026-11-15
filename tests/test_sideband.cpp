@@ -28,6 +28,21 @@ int main() {
   CHECK_EQ(rev.swappedTones().spaceFreq(), 2125.0);
   CHECK(!rev.swappedTones().reverse);
   CHECK_EQ(lsb.swappedTones().swappedTones().markFreq, lsb.markFreq);
+
+  // Tuning to a signal found in the tones in use (Skimmer row, waterfall label): the mark
+  // in use must land on it, not a shift away, with or without the swap and with Rev.
+  for (bool reversed : {false, true}) {
+    RttyParams stored;
+    stored.reverse = reversed;
+    for (bool swapped : {false, true}) {
+      RttyParams t = stored.withMarkInUse(1500, swapped);
+      RttyParams inUse = swapped ? t.swappedTones() : t;
+      CHECK_EQ(inUse.markFreq, 1500.0);
+      CHECK_EQ(inUse.shift, stored.shift);
+      CHECK_EQ(inUse.reverse, (swapped ? stored.swappedTones() : stored).reverse);
+      CHECK_EQ(t.reverse, stored.reverse);   // the stored polarity is kept
+    }
+  }
   CHECK(!lsb.swappedTones().swappedTones().reverse);
   // The Rev box: mark and space change places, the pair stays put (issue #21: it used to
   // keep mark and move space to the other side, 170 Hz off the signal).
