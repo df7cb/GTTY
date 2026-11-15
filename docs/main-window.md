@@ -24,7 +24,9 @@ The window title shows the name of the active configuration when it is not *Defa
 
 ## Waterfall and spectrum
 
-The left part shows a spectrum of the receive audio above a scrolling waterfall. The shaded band is the tone window between the mark and space cursors, which follow the AFC. Notches are drawn as vertical marks. The frequency under the pointer is shown in the corner.
+The left part shows a spectrum of the receive audio above a scrolling waterfall. The shaded band is the tone window between the mark and space cursors, which follow the AFC. Notches are drawn as vertical marks. The frequency under the pointer is shown in the corner, as audio and as the radio frequency it comes to with the dial where it is. The radio frequency of the mark is shown beside the mark cursor at the foot of the spectrum.
+
+UTC time stamps run down the left edge of the waterfall, spaced to suit the scroll rate (every 5 s up to every hour). When the dial moves, an orange dashed line across the waterfall marks the new frequency: the history below it was received on the old one.
 
 By default the direction follows the rig's sideband, so in RTTY-L or LSB higher audio frequencies are on the left, the same way as the rig's own scope. Change this under *Preferences → Station → Waterfall direction*. The displayed range is 300–3000 Hz by default and is set on the same page.
 

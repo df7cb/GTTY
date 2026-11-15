@@ -184,6 +184,7 @@ void MainWindow::buildUi(AdwApplication* app) {
     applyRttyParams(true);
   };
   wf_.onMiddleClick = [this](double hz) { toggleNotch(hz); };
+  wf_.radioFrequency = [this](double audioHz) { return dialFreqHz() > 0 ? audioMarkRadioFrequency(audioHz) : -1.0; };
   wf_.onLabelClick = [this](double markHz, const std::string& call) { tuneToSkimmed(markHz, call); };
   wf_.onNudge = [this](double deltaHz) {
     settings_.rtty.markFreq = std::round(settings_.rtty.markFreq + deltaHz);
@@ -1117,6 +1118,7 @@ void MainWindow::updateWaterfallDirection() {
 
 void MainWindow::updateFreqDisplay(const RigState& s) {
   long hz = std::lround(s.connected ? s.freqHz : settings_.manualDialHz);
+  wf_.setDialHz(static_cast<double>(hz));
   char buf[32];
   snprintf(buf, sizeof buf, "%ld.%03ld.%02ld", hz / 1000000, (hz / 1000) % 1000, (hz % 1000) / 10);
   gtk_label_set_text(GTK_LABEL(freqLabel_), buf);

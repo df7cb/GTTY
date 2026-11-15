@@ -45,6 +45,13 @@ class Waterfall {
   void clearCallLabels() { labels_.clear(); gtk_widget_queue_draw(area_); }
   std::function<void(double markHz, const std::string& call)> onLabelClick;
 
+  // Radio frequency of an audio frequency, with the dial where it is now (<= 0 if unknown).
+  // Shown beside the mark cursor and in the pointer readout.
+  std::function<double(double audioHz)> radioFrequency;
+  // The dial now. A change after the first is marked across the waterfall, so the
+  // history below it is read against the old frequency.
+  void setDialHz(double hz);
+
  private:
   static void draw(GtkDrawingArea*, cairo_t* cr, int w, int h, gpointer self);
   static void pressed(GtkGestureClick* g, int n, double x, double y, gpointer self);
@@ -76,6 +83,15 @@ class Waterfall {
   void labelBox(const CallLabel& l, int w, double& x, double& y, double& bw, double& bh) const;
   const CallLabel* labelAt(double x, double y, int w) const;
   static void colormap(float v, unsigned char* bgra);
+  static std::string formatRf(double hz);   // 14.083.15
+  void addTimeMark();
+
+  // A row of the history marked with the UTC time, or with a dial change.
+  struct RowMark {
+    int64_t row;
+    std::string text;
+    bool dial;
+  };
 
   GtkWidget* area_;
   cairo_surface_t* surf_ = nullptr;
@@ -95,6 +111,11 @@ class Waterfall {
   std::vector<double> notches_;
   std::vector<CallLabel> labels_;
   int64_t rows_ = 0;   // rows scrolled since start
+  std::vector<RowMark> marks_;
+  double rowsPerSec_ = 0;     // scroll rate, smoothed
+  int64_t lastTimeSlot_ = -1;
+  int timeInterval_ = 0;      // seconds between time marks
+  double dialHz_ = 0;
   // drag state
   double dragStartX_ = 0, dragStartY_ = 0;
   double dragStartCenter_ = 0;
