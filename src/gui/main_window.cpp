@@ -1096,6 +1096,11 @@ double MainWindow::audioMarkRadioFrequency(double audioMarkHz) const {
                             audioMarkHz - tone);
 }
 
+double MainWindow::radioFrequencyAudioMark(double markRfHz) const {
+  return audioMarkForRadioFrequency(markRfHz, dialFreqHz(), rigState_.connected ? rigState_.mode : "", lsbLike(),
+                                    activeRtty().markFreq);
+}
+
 bool MainWindow::sidebandSwap() const {
   return settings_.followRigSideband && rigState_.connected && isUpperSidebandMode(rigState_.mode);
 }
@@ -2015,22 +2020,26 @@ void MainWindow::onSkimmerToggled(GSimpleAction*, GVariant*, gpointer p) {
 
 void MainWindow::onSkimmerText(const SkimmerTextEvent& e) {
   int64_t now = g_get_monotonic_time();
+  // The same station is the one on the same radio frequency: after a QSY, another one
+  // can be heard where it was in the audio.
+  const double rf = audioMarkRadioFrequency(e.markHz);
   SkimEntry* hit = nullptr;
   for (auto& s : skim_)
-    if (std::fabs(s.markHz - e.markHz) <= settings_.skimmerStepHz + 5) { hit = &s; break; }
+    if (std::fabs(s.rfHz - rf) <= settings_.skimmerStepHz + 5) { hit = &s; break; }
   if (!hit) {
-    skim_.push_back({e.markHz, "", "", now, e.quality});
+    skim_.push_back({rf, "", "", now, e.quality});
     hit = &skim_.back();
   }
-  hit->markHz = 0.8 * hit->markHz + 0.2 * e.markHz;
+  hit->rfHz = 0.8 * hit->rfHz + 0.2 * rf;
+  const double markHz = radioFrequencyAudioMark(hit->rfHz);
   hit->lastSeen = now;
   hit->quality = e.quality;
   for (char c : e.text) hit->text.push_back(c == '\n' || c == '\r' ? ' ' : c);
   if (hit->text.size() > 160) hit->text.erase(0, hit->text.size() - 160);
   for (const auto& [pos, len] : findCallsigns(hit->text)) hit->call = upper(hit->text.substr(pos, len));
   skimDirty_ = true;
-  labelSkimmed(hit->text, hit->markHz);
-  spotSkimmed(hit->text, hit->markHz);
+  labelSkimmed(hit->text, markHz);
+  spotSkimmed(hit->text, markHz);
 }
 
 // Label the station a skimmer channel identifies on the waterfall: when it is first
@@ -2139,18 +2148,21 @@ void MainWindow::rebuildSkimList() {
   skimDirty_ = false;
   skimRebuiltAt_ = g_get_monotonic_time();
   while (GtkWidget* c = gtk_widget_get_first_child(skimList_)) gtk_list_box_remove(GTK_LIST_BOX(skimList_), c);
-  std::sort(skim_.begin(), skim_.end(), [](const SkimEntry& a, const SkimEntry& b) { return a.markHz < b.markHz; });
+  std::sort(skim_.begin(), skim_.end(), [](const SkimEntry& a, const SkimEntry& b) { return a.rfHz < b.rfHz; });
   int64_t now = g_get_monotonic_time();
   for (size_t i = 0; i < skim_.size(); ++i) {
     const SkimEntry& s = skim_[i];
-    double rf = audioMarkRadioFrequency(s.markHz);
+    const double rf = s.rfHz;
+    const double markHz = radioFrequencyAudioMark(rf);
+    const bool inAudio = markHz >= settings_.waterfallLoHz && markHz <= settings_.waterfallHiHz;
     GtkWidget* box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
     GtkWidget* top = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
     char f[32];
     snprintf(f, sizeof f, "%8.1f", rf / 1000.0);
     GtkWidget* freq = gtk_label_new(f);
     gtk_widget_add_css_class(freq, "spot-freq");
-    gtk_widget_set_tooltip_text(freq, (std::to_string(static_cast<int>(std::lround(s.markHz))) + " Hz mark tone").c_str());
+    gtk_widget_set_tooltip_text(freq, inAudio ? (std::to_string(static_cast<int>(std::lround(markHz))) + " Hz mark tone").c_str()
+                                              : "Outside the receiver's audio since a QSY");
     gtk_box_append(GTK_BOX(top), freq);
     GtkWidget* call = gtk_label_new(s.call.empty() ? "?" : s.call.c_str());
     gtk_widget_add_css_class(call, "spot-call");
@@ -2178,7 +2190,8 @@ void MainWindow::rebuildSkimList() {
       if (log_.isDupe(s.call, bandForFrequency(dialFreqHz()), "RTTY")) gtk_widget_add_css_class(row, "spot-dupe");
       else if (log_.find(s.call).empty()) gtk_widget_add_css_class(row, "spot-new");
     }
-    gtk_widget_set_tooltip_text(row, "Click: tune the decoders to this signal and take the callsign");
+    gtk_widget_set_tooltip_text(row, inAudio ? "Click: tune the decoders to this signal and take the callsign"
+                                             : "Click: QSY the rig onto this station and take the callsign");
     gtk_list_box_append(GTK_LIST_BOX(skimList_), row);
   }
 }
@@ -2188,7 +2201,16 @@ void MainWindow::onSkimActivated(GtkListBox*, GtkListBoxRow* row, gpointer p) {
   int idx = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(row), "skim-index"));
   if (idx < 0 || idx >= static_cast<int>(self->skim_.size())) return;
   const SkimEntry s = self->skim_[idx];
-  self->tuneToSkimmed(s.markHz, s.call);
+  const double markHz = self->radioFrequencyAudioMark(s.rfHz);
+  if (markHz >= self->settings_.waterfallLoHz && markHz <= self->settings_.waterfallHiHz) {
+    self->tuneToSkimmed(markHz, s.call);
+    return;
+  }
+  // Heard before a QSY and out of the audio now: put the dial where it lands on the tones in use.
+  if (self->tx_.transmitting()) { self->toast("Not while transmitting"); return; }
+  self->setDial(dialForMarkRadioFrequency(s.rfHz, self->rigState_.connected ? self->rigState_.mode : "", self->lsbLike(),
+                                          self->activeRtty().markFreq));
+  self->tuneToSkimmed(self->activeRtty().markFreq, s.call);
 }
 
 void MainWindow::openCluster() {

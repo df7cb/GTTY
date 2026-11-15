@@ -76,4 +76,21 @@ inline double markRadioFrequency(double dialHz, const std::string& rigMode, bool
   return lowerSideband ? dialHz - audio : dialHz + audio;
 }
 
+// The other way round: the audio mark tone at which a station whose mark is on markRfHz is
+// heard with the dial where it is now. Outside the receiver's audio when the dial has
+// moved away (issue #46: the Skimmer keeps the radio frequency it heard a station on).
+inline double audioMarkForRadioFrequency(double markRfHz, double dialHz, const std::string& rigMode,
+                                         bool lowerSideband, double markToneHz) {
+  const bool fsk = rigMode == "RTTY" || rigMode == "RTTYR";
+  const double fromDial = lowerSideband ? dialHz - markRfHz : markRfHz - dialHz;
+  return fsk ? markToneHz + fromDial : fromDial;
+}
+
+// The dial frequency that puts a station whose mark is on markRfHz on the mark tone in use.
+inline double dialForMarkRadioFrequency(double markRfHz, const std::string& rigMode, bool lowerSideband,
+                                        double markToneHz) {
+  if (rigMode == "RTTY" || rigMode == "RTTYR") return markRfHz;
+  return lowerSideband ? markRfHz + markToneHz : markRfHz - markToneHz;
+}
+
 }  // namespace gtty

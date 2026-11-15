@@ -78,6 +78,7 @@ class MainWindow {
   bool lsbLike() const;
   // The radio frequency of a signal whose mark is at `audioMarkHz` in the audio (a skimmer channel).
   double audioMarkRadioFrequency(double audioMarkHz) const;
+  double radioFrequencyAudioMark(double markRfHz) const;   // the inverse, with the dial where it is now
   // The rig is on the upper sideband and gtty follows it: mark and space are exchanged.
   bool sidebandSwap() const;
   // The tones in use: the configured ones, exchanged while sidebandSwap().
@@ -238,7 +239,9 @@ class MainWindow {
   std::string lastCallbookError_;
   bool rigHasIfShift_ = false;
   std::string pttText_;
-  struct SkimEntry { double markHz; std::string text, call; int64_t lastSeen; float quality; };
+  // A station the Skimmer heard, kept on the radio frequency it was heard on (issue #46):
+  // a QSY moves where it is in the audio, not where it is on the band.
+  struct SkimEntry { double rfHz; std::string text, call; int64_t lastSeen; float quality; };
   std::vector<SkimEntry> skim_;
   bool skimDirty_ = false;
   int64_t skimRebuiltAt_ = 0;
