@@ -1,0 +1,2 @@
+# Lets a source tarball ("git archive", GitHub downloads) know its own version.
+.git_archival.txt export-subst

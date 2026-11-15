@@ -1,5 +1,29 @@
 cmake_minimum_required(VERSION 3.20)
-project(gtty VERSION 0.1.0 LANGUAGES C CXX)
+
+# The version comes from git (the tag, or the tag and commit): see cmake/GttyVersion.cmake.
+set(GTTY_VERSION_OVERRIDE "" CACHE STRING "Version to report instead of the one git gives (for packagers)")
+include(${CMAKE_CURRENT_LIST_DIR}/cmake/GttyVersion.cmake)
+gtty_detect_version(${CMAKE_CURRENT_LIST_DIR})
+project(gtty VERSION ${GTTY_VERSION_NUMERIC} LANGUAGES C CXX)
+message(STATUS "gtty version ${GTTY_VERSION} (package ${GTTY_VERSION_PACKAGE})")
+
+# The files that carry the version are regenerated on every build, so a build made after
+# a new commit or tag reports it without re-running CMake by hand.
+set(GTTY_GENERATED_DIR ${CMAKE_BINARY_DIR}/generated)
+set(GTTY_VERSION_SCRIPT_ARGS -DSOURCE_DIR=${CMAKE_SOURCE_DIR} -DOUT_DIR=${GTTY_GENERATED_DIR}
+    -DGTTY_VERSION_OVERRIDE=${GTTY_VERSION_OVERRIDE} -P ${CMAKE_SOURCE_DIR}/cmake/GenerateVersionFiles.cmake)
+execute_process(COMMAND ${CMAKE_COMMAND} ${GTTY_VERSION_SCRIPT_ARGS} COMMAND_ERROR_IS_FATAL ANY)
+add_custom_target(gtty_version ALL
+  COMMAND ${CMAKE_COMMAND} ${GTTY_VERSION_SCRIPT_ARGS}
+  BYPRODUCTS ${GTTY_GENERATED_DIR}/gtty_version.h ${GTTY_GENERATED_DIR}/gtty.1 ${GTTY_GENERATED_DIR}/gtty-cli.1
+             ${GTTY_GENERATED_DIR}/changelog ${GTTY_GENERATED_DIR}/io.github.gtty.metainfo.xml
+  COMMENT "Checking the version in git" VERBATIM)
+# The package version below is fixed when CMake runs; re-run it when HEAD moves.
+foreach(f HEAD logs/HEAD packed-refs)
+  if(EXISTS ${CMAKE_SOURCE_DIR}/.git/${f})
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/.git/${f})
+  endif()
+endforeach()
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -53,15 +77,14 @@ endif()
 # ------------------------------------------------- docs, man pages, license
 find_program(GZIP_EXECUTABLE gzip)
 if(GZIP_EXECUTABLE)
-  foreach(pair "packaging/changelog;changelog.gz" "packaging/gtty.1;gtty.1.gz" "packaging/gtty-cli.1;gtty-cli.1.gz")
-    list(GET pair 0 src)
-    list(GET pair 1 out)
-    add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/${out}
-      COMMAND ${GZIP_EXECUTABLE} -9n -c ${CMAKE_SOURCE_DIR}/${src} > ${CMAKE_BINARY_DIR}/${out}
-      DEPENDS ${CMAKE_SOURCE_DIR}/${src} VERBATIM)
-    list(APPEND GTTY_GZ_FILES ${CMAKE_BINARY_DIR}/${out})
+  foreach(name changelog gtty.1 gtty-cli.1)   # generated with the version filled in
+    add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/${name}.gz
+      COMMAND ${GZIP_EXECUTABLE} -9n -c ${GTTY_GENERATED_DIR}/${name} > ${CMAKE_BINARY_DIR}/${name}.gz
+      DEPENDS ${GTTY_GENERATED_DIR}/${name} gtty_version VERBATIM)
+    list(APPEND GTTY_GZ_FILES ${CMAKE_BINARY_DIR}/${name}.gz)
   endforeach()
   add_custom_target(gtty_docs ALL DEPENDS ${GTTY_GZ_FILES})
+  add_dependencies(gtty_docs gtty_version)
   install(FILES ${CMAKE_BINARY_DIR}/changelog.gz DESTINATION share/doc/gtty)
   install(FILES ${CMAKE_BINARY_DIR}/gtty.1.gz ${CMAKE_BINARY_DIR}/gtty-cli.1.gz DESTINATION share/man/man1)
 endif()
@@ -69,6 +92,7 @@ install(FILES ${CMAKE_SOURCE_DIR}/packaging/copyright DESTINATION share/doc/gtty
 
 # ---------------------------------------------------------------- packaging
 set(CPACK_PACKAGE_NAME "gtty")
+set(CPACK_PACKAGE_VERSION "${GTTY_VERSION_PACKAGE}")   # "0.2.8", or "0.2.8+3.g1a2b3c4" between tags
 set(CPACK_PACKAGE_VENDOR "gtty contributors")
 set(CPACK_PACKAGE_CONTACT "Gordon Young <gjyoung1974@gmail.com>")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Amateur radio RTTY terminal (GTK4, Hamlib, AFSK/FSK)")

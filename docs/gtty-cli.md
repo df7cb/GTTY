@@ -9,6 +9,7 @@ nav_order: 14
 
 ```
 gtty-cli encode|decode|listen|record|devices|rigs|rig [options]
+gtty-cli --version
 ```
 
 ## Commands
@@ -22,6 +23,7 @@ gtty-cli encode|decode|listen|record|devices|rigs|rig [options]
 | `devices` | List PortAudio devices with their index, host API, channel counts and default sample rate |
 | `rigs [filter]` | List Hamlib rig models, optionally those whose manufacturer or name contains the filter |
 | `rig --model N --device DEV` | Open the rig, wait briefly and print frequency, mode, filter width and PTT state |
+| `--version` | Print the version: the git tag the program was built from, or the tag and commit |
 
 ## Examples
 

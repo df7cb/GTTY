@@ -1,0 +1,3 @@
+// Generated at build time from git (cmake/GttyVersion.cmake). Include core/version.h instead.
+#pragma once
+#define GTTY_VERSION_STRING "@GTTY_VERSION@"

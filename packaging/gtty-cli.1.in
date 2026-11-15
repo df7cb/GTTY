@@ -1,4 +1,4 @@
-.TH GTTY-CLI 1 "November 2026" "gtty 0.1.0" "User Commands"
+.TH GTTY-CLI 1 "@GTTY_VERSION_MAN_DATE@" "gtty @GTTY_VERSION@" "User Commands"
 .SH NAME
 gtty-cli \- command-line RTTY encoder, decoder and audio tools for gtty
 .SH SYNOPSIS
@@ -25,6 +25,9 @@ List audio devices.
 .TP
 .BR rigs " [" filter ]
 List Hamlib rig models.
+.TP
+.B \-\-version
+Print the version: the git tag the program was built from, or the tag and commit.
 .TP
 .B rig
 Read frequency and mode from a rig

@@ -12,11 +12,9 @@
 
 #include "core/log/adif.h"
 #include "core/log/grid.h"
+#include "core/version.h"
 #include "prefs_dialog.h"
 
-#ifndef GTTY_VERSION
-#define GTTY_VERSION "dev"
-#endif
 
 namespace gtty {
 
@@ -1534,7 +1532,7 @@ void MainWindow::onAction(GSimpleAction* a, GVariant*, gpointer p) {
     gtk_uri_launcher_launch(l, GTK_WINDOW(self->window_), nullptr, nullptr, nullptr);
     g_object_unref(l);
   } else if (name == "about") {
-    adw_show_about_dialog(self->window_, "application-name", "gtty", "version", GTTY_VERSION,
+    adw_show_about_dialog(self->window_, "application-name", "gtty", "version", gtty::version(),
                           "developer-name", "gtty contributors",
                           "comments", "Amateur radio RTTY terminal: AFSK/FSK modem, Hamlib rig control, parallel decoders.",
                           "website", kManualUrl,
@@ -2384,11 +2382,11 @@ xmlrpc::Value MainWindow::rpcDispatch(const std::string& m, const std::vector<xm
   if (m == "system.methodHelp") return V::string("gtty: fldigi-compatible method");
   if (m == "system.methodSignature") return V::array({V::string("undef")});
   if (m == "fldigi.name") return V::string("gtty");
-  if (m == "fldigi.version") return V::string(GTTY_VERSION);
-  if (m == "fldigi.name_version") return V::string(std::string("gtty ") + GTTY_VERSION);
+  if (m == "fldigi.version") return V::string(gtty::version());
+  if (m == "fldigi.name_version") return V::string(std::string("gtty ") + gtty::version());
   if (m == "fldigi.version_struct") {
     int maj = 0, min = 0, pat = 0;
-    sscanf(GTTY_VERSION, "%d.%d.%d", &maj, &min, &pat);
+    sscanf(gtty::version(), "%d.%d.%d", &maj, &min, &pat);
     return V::strct({{"major", V::integer(maj)}, {"minor", V::integer(min)}, {"patch", V::integer(pat)}});
   }
   if (m == "fldigi.list") {
@@ -2541,7 +2539,7 @@ void MainWindow::openGridTracker() {
     return;
   }
   gt_.onIncoming = [this](const wsjtx::Incoming& in) { gtHandle(in); };
-  gt_.send(wsjtx::encodeHeartbeat(gt_.id(), GTTY_VERSION));
+  gt_.send(wsjtx::encodeHeartbeat(gt_.id(), gtty::version()));
   gtLastHeartbeat_ = g_get_monotonic_time();
   gtSendStatus();
 }
@@ -2551,7 +2549,7 @@ void MainWindow::gtTick() {
   gt_.poll();
   int64_t now = g_get_monotonic_time();
   if (now - gtLastHeartbeat_ > 15 * G_USEC_PER_SEC) {
-    gt_.send(wsjtx::encodeHeartbeat(gt_.id(), GTTY_VERSION));
+    gt_.send(wsjtx::encodeHeartbeat(gt_.id(), gtty::version()));
     gtLastHeartbeat_ = now;
   }
   gtSendStatus();

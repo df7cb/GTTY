@@ -1,7 +1,10 @@
 #include <adwaita.h>
 
+#include <cstdio>
+#include <cstring>
 #include <memory>
 
+#include "core/version.h"
 #include "main_window.h"
 
 namespace {
@@ -14,6 +17,9 @@ void activate(AdwApplication* app, gpointer) {
 }  // namespace
 
 int main(int argc, char** argv) {
+  for (int i = 1; i < argc; ++i) {
+    if (!std::strcmp(argv[i], "--version")) { std::printf("gtty %s\n", gtty::version()); return 0; }
+  }
   g_set_prgname("gtty");
   AdwApplication* app = adw_application_new("io.github.gtty", G_APPLICATION_NON_UNIQUE);
   g_signal_connect(app, "activate", G_CALLBACK(activate), nullptr);

@@ -6,6 +6,7 @@
 //   gtty-cli devices                          list audio devices
 //   gtty-cli rigs [filter]                    list Hamlib rig models
 //   gtty-cli rig --model N --device DEV       show rig frequency / mode
+//   gtty-cli --version                        show the version (git tag or commit)
 // Options: --baud 45.45 --shift 170 --mark 2125 --reverse --rate 48000
 //          --no-afc --no-atc --squelch Q (0..1, as the GUI slider) --in DEV --out DEV --usos/--no-usos --ustty
 //          --start S --limit S (decode window) --quiet (stats only)
@@ -24,6 +25,7 @@
 #include "core/audio/audio_engine.h"
 #include "core/audio/wav_file.h"
 #include "core/dsp/resampler.h"
+#include "core/version.h"
 #include "core/events.h"
 #include "core/modem/rtty_modulator.h"
 #include "core/receiver.h"
@@ -310,9 +312,13 @@ int cmdRig(const Opts& o) {
 }  // namespace
 
 int main(int argc, char** argv) {
+  if (argc > 1 && (std::string(argv[1]) == "--version" || std::string(argv[1]) == "version")) {
+    std::cout << "gtty-cli " << gtty::version() << "\n";
+    return 0;
+  }
   Opts o = parse(argc, argv);
   if (o.positional.empty()) {
-    std::cerr << "usage: gtty-cli encode|decode|listen|devices|rigs|rig [options]\n";
+    std::cerr << "usage: gtty-cli encode|decode|listen|devices|rigs|rig [options] | --version\n";
     return 2;
   }
   const std::string& cmd = o.positional[0];
