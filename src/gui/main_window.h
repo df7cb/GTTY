@@ -313,6 +313,7 @@ class MainWindow {
   int64_t txEndedAt_ = 0;
   bool autoCq_ = false;
   std::vector<bool> rxLineStart_;
+  std::vector<bool> echoStarted_;   // per pane: this transmission's text has begun (onTxEnded clears it)
   std::vector<LineBreaks> rxBreaks_;  // per pane: CR, LF, CR LF -> one line break
   std::vector<GtkTextTag*> timeTags_;
   std::ofstream sessionFile_;
