@@ -129,6 +129,8 @@ class MainWindow {
   // decoders: per-engine modes, best-guess pane, skimmer
   void applyDecoderSettings();
   void onSkimmerText(const SkimmerTextEvent& e);
+  void labelSkimmed(const std::string& text, double markHz);
+  void tuneToSkimmed(double markHz, const std::string& call);
   void rebuildSkimList();
   void ageSkim();
   static void onModeNotify(GObject* drop, GParamSpec*, gpointer self);
@@ -237,6 +239,8 @@ class MainWindow {
   std::vector<SkimEntry> skim_;
   bool skimDirty_ = false;
   int64_t skimRebuiltAt_ = 0;
+  struct WfLabel { double markHz; int kind; int64_t at; };
+  std::map<std::string, WfLabel> wfLabels_;   // callsign -> its last label on the waterfall
 
   // widgets
   GtkWidget* window_ = nullptr;

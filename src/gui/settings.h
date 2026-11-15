@@ -87,6 +87,7 @@ struct Settings {
   bool showVotePane = true;   // merged best-guess pane
   bool skimmerEnabled = false;
   double skimmerStepHz = 50;  // channel spacing across the waterfall range
+  bool skimmerWaterfallCalls = true;  // label identified stations on the waterfall
   // The radio's built-in decoder, read from the serial port it prints on (Icom "RTTY Decode")
   bool radioDecoderEnabled = false;
   std::string radioDecoderDevice;
