@@ -365,6 +365,16 @@ GtkWidget* MainWindow::buildRxPanes() {
     GtkGesture* click = gtk_gesture_click_new();
     g_signal_connect(click, "pressed", G_CALLBACK(onRxClicked), this);
     gtk_widget_add_controller(view, GTK_EVENT_CONTROLLER(click));
+    // A word left in the wrong Baudot shift ("QWY" for 126): hovering shows the other
+    // reading, the context menu rewrites it. The tooltip is asked for by GTK when the
+    // pointer rests, never set from the poll loop (that would stop every tooltip).
+    gtk_widget_set_has_tooltip(view, TRUE);
+    g_signal_connect(view, "query-tooltip", G_CALLBACK(onRxQueryTooltip), this);
+    GtkGesture* menuClick = gtk_gesture_click_new();
+    gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(menuClick), GDK_BUTTON_SECONDARY);
+    gtk_event_controller_set_propagation_phase(GTK_EVENT_CONTROLLER(menuClick), GTK_PHASE_CAPTURE);
+    g_signal_connect(menuClick, "pressed", G_CALLBACK(onRxSecondaryPressed), this);
+    gtk_widget_add_controller(view, GTK_EVENT_CONTROLLER(menuClick));
 
     GtkWidget* scroll = gtk_scrolled_window_new();
     gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scroll), view);
@@ -661,7 +671,7 @@ void MainWindow::installActions() {
   static const char* names[] = {"prefs", "reset-afc", "clear-rx", "export-adif", "about",
                                 "log-qso", "clear-qso", "abort-tx", "start-tx", "stop-tx", "clear-notches",
                                 "clear-text", "profile-clone", "profile-rename", "profile-delete",
-                                "profile-reset", "cw-id", "help", nullptr};
+                                "profile-reset", "cw-id", "help", "other-shift", nullptr};
   for (int i = 0; names[i]; ++i) {
     GSimpleAction* a = g_simple_action_new(names[i], nullptr);
     g_signal_connect(a, "activate", G_CALLBACK(onAction), this);
@@ -1406,6 +1416,107 @@ void MainWindow::pickWord(GtkTextView* view, double x, double y) {
   }
 }
 
+bool MainWindow::rxTokenAt(GtkTextView* view, double x, double y, GtkTextIter* start, GtkTextIter* end, std::string* text) {
+  int bx, by;
+  gtk_text_view_window_to_buffer_coords(view, GTK_TEXT_WINDOW_WIDGET, static_cast<int>(x), static_cast<int>(y), &bx, &by);
+  GtkTextIter it;
+  // _at_position gives the character under the point; _at_location would give the next
+  // one when the pointer is on the right half of a character.
+  if (!gtk_text_view_get_iter_at_position(view, &it, nullptr, bx, by)) return false;
+  // Past the end of a line the nearest character is returned: only take one the pointer is on.
+  GdkRectangle cell;
+  gtk_text_view_get_iter_location(view, &it, &cell);
+  if (bx < cell.x || bx >= cell.x + cell.width || by < cell.y || by >= cell.y + cell.height) return false;
+  if (g_unichar_isspace(gtk_text_iter_get_char(&it))) return false;
+  GtkTextIter a = it, b = it;
+  while (!gtk_text_iter_is_start(&a)) {
+    GtkTextIter prev = a;
+    gtk_text_iter_backward_char(&prev);
+    if (g_unichar_isspace(gtk_text_iter_get_char(&prev))) break;
+    a = prev;
+  }
+  while (!gtk_text_iter_is_end(&b) && !g_unichar_isspace(gtk_text_iter_get_char(&b))) gtk_text_iter_forward_char(&b);
+  gchar* w = gtk_text_buffer_get_text(gtk_text_view_get_buffer(view), &a, &b, FALSE);
+  *text = w ? w : "";
+  g_free(w);
+  *start = a;
+  *end = b;
+  return !text->empty();
+}
+
+gboolean MainWindow::onRxQueryTooltip(GtkWidget* view, int x, int y, gboolean keyboard, GtkTooltip* tip, gpointer p) {
+  auto* self = static_cast<MainWindow*>(p);
+  if (keyboard) return FALSE;
+  GtkTextIter a, b;
+  std::string word;
+  if (!self->rxTokenAt(GTK_TEXT_VIEW(view), x, y, &a, &b, &word)) return FALSE;
+  bool toFigures = false;
+  std::string other = baudot::otherShiftReading(word, self->settings_.rtty.variant, &toFigures);
+  if (other.empty()) return FALSE;
+  std::string text = other + (toFigures ? "  (if the figures shift was lost)" : "  (if the letters shift was lost)");
+  gtk_tooltip_set_text(tip, text.c_str());
+  // Tie the tip to the word, so that moving to the next word asks again.
+  GdkRectangle ra, rb;
+  gtk_text_view_get_iter_location(GTK_TEXT_VIEW(view), &a, &ra);
+  GtkTextIter last = b;
+  gtk_text_iter_backward_char(&last);
+  gtk_text_view_get_iter_location(GTK_TEXT_VIEW(view), &last, &rb);
+  if (ra.y == rb.y) {   // a word wrapped over two lines keeps the default area
+    GdkRectangle area{ra.x, ra.y, rb.x + rb.width - ra.x, ra.height};
+    gtk_text_view_buffer_to_window_coords(GTK_TEXT_VIEW(view), GTK_TEXT_WINDOW_WIDGET, area.x, area.y, &area.x, &area.y);
+    gtk_tooltip_set_tip_area(tip, &area);
+  }
+  return TRUE;
+}
+
+void MainWindow::onRxSecondaryPressed(GtkGestureClick* g, int, double x, double y, gpointer p) {
+  GtkWidget* w = gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(g));
+  static_cast<MainWindow*>(p)->prepareOtherShift(GTK_TEXT_VIEW(w), x, y);
+  // Not claimed: the text view goes on to open its context menu, now with our item in it.
+}
+
+void MainWindow::prepareOtherShift(GtkTextView* view, double x, double y) {
+  if (shiftFixBuf_) {
+    gtk_text_buffer_delete_mark(shiftFixBuf_, shiftFixStart_);
+    gtk_text_buffer_delete_mark(shiftFixBuf_, shiftFixEnd_);
+    shiftFixBuf_ = nullptr;
+  }
+  for (GtkWidget* v : rxViews_)
+    if (v) gtk_text_view_set_extra_menu(GTK_TEXT_VIEW(v), nullptr);
+  GtkTextIter a, b;
+  std::string word;
+  if (!rxTokenAt(view, x, y, &a, &b, &word)) return;
+  std::string other = baudot::otherShiftReading(word, settings_.rtty.variant);
+  if (other.empty()) return;
+  shiftFixBuf_ = gtk_text_view_get_buffer(view);
+  shiftFixStart_ = gtk_text_buffer_create_mark(shiftFixBuf_, nullptr, &a, TRUE);
+  shiftFixEnd_ = gtk_text_buffer_create_mark(shiftFixBuf_, nullptr, &b, FALSE);
+  shiftFixFrom_ = word;
+  shiftFixTo_ = other;
+  GMenu* menu = g_menu_new();
+  std::string label = "Change \u201c" + word + "\u201d to \u201c" + other + "\u201d";
+  // A literal underscore in the word would otherwise be read as a mnemonic.
+  for (size_t i = label.find('_'); i != std::string::npos; i = label.find('_', i + 2)) label.insert(i, "_");
+  g_menu_append(menu, label.c_str(), "win.other-shift");
+  gtk_text_view_set_extra_menu(view, G_MENU_MODEL(menu));
+  g_object_unref(menu);
+}
+
+void MainWindow::applyOtherShift() {
+  if (!shiftFixBuf_) return;
+  GtkTextIter a, b;
+  gtk_text_buffer_get_iter_at_mark(shiftFixBuf_, &a, shiftFixStart_);
+  gtk_text_buffer_get_iter_at_mark(shiftFixBuf_, &b, shiftFixEnd_);
+  gchar* now = gtk_text_buffer_get_text(shiftFixBuf_, &a, &b, FALSE);
+  bool same = now && shiftFixFrom_ == now;   // the pane may have been trimmed or cleared since
+  g_free(now);
+  if (!same) return;
+  gtk_text_buffer_delete(shiftFixBuf_, &a, &b);
+  gtk_text_buffer_insert(shiftFixBuf_, &a, shiftFixTo_.c_str(), -1);
+  // Marks stay valid; the word no longer has another reading worth offering.
+  shiftFixFrom_ = shiftFixTo_;
+}
+
 void MainWindow::onRxClicked(GtkGestureClick* g, int, double x, double y, gpointer p) {
   GtkWidget* w = gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(g));
   static_cast<MainWindow*>(p)->pickWord(GTK_TEXT_VIEW(w), x, y);
@@ -1517,6 +1628,7 @@ void MainWindow::onAction(GSimpleAction* a, GVariant*, gpointer p) {
   else if (name == "profile-delete") self->deleteProfile();
   else if (name == "profile-reset") self->resetProfile();
   else if (name == "cw-id") self->sendCwId();
+  else if (name == "other-shift") self->applyOtherShift();
   else if (name == "reset-afc") self->rx_.resetAfc();
   else if (name == "clear-rx") self->clearRx();
   else if (name == "clear-text") self->clearText();

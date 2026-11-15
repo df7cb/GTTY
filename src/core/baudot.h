@@ -22,6 +22,18 @@ constexpr uint8_t LTRS  = 0x1F;
 // Letters table (shared by both variants) and figures tables.
 const char* lettersTable();                     // 32 entries
 const char* figuresTable(BaudotVariant v);      // 32 entries
+
+// What a received word would have read had the decoder been in the other shift. A noise
+// hit on a FIGS or LTRS code leaves the rest of the word in the wrong case: a serial
+// number 126 prints as "QWY" (the digits sit on the same codes as the top row of
+// letters), a call DF7CB as "$!7:?". Returns the other reading when the word looks like
+// such a casualty, and an empty string when it does not:
+//   - only the letters Q W E R T Y U I O P, two or more: the digits ("WPO" -> "209")
+//   - punctuation in it: each punctuation mark becomes its letter; letters and digits
+//     stay, since digits are sent in figures anyway ("DF7:?" -> "DF7CB")
+// toFigures says which of the two it was. Bracketed words such as the "[07:22:39]"
+// timestamps are left alone.
+std::string otherShiftReading(const std::string& word, BaudotVariant v, bool* toFigures = nullptr);
 }  // namespace baudot
 
 class BaudotEncoder {

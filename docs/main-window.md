@@ -68,6 +68,8 @@ When a station stops sending, the decoders go on printing what the band noise sp
 - a number goes to **Exch rcvd**,
 - a word of letters goes to **Name**.
 
+**A word in the wrong shift.** Baudot sends letters and figures on the same codes and switches between them with a shift character. When noise swallows that character the rest of the word prints in the wrong case: the serial number `126` arrives as `QWY`, since the digits share their codes with the top row of letters, and a call can arrive as `DF7:?`. Rest the pointer on such a word and a hint shows the other reading. Right-click it and choose **Change "QWY" to "126"** to rewrite it in that pane, after which it can be clicked like any other word. The hint appears for words made only of the letters Q W E R T Y U I O P and for words with punctuation in them; it is a suggestion, and ordinary words such as `TU` get one too.
+
 Received text is kept to about 200 000 characters per pane; older text is dropped.
 
 ## Transmit pane

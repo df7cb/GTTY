@@ -102,6 +102,10 @@ class MainWindow {
   void clearQsoFields();
   void updateDupe();
   void pickWord(GtkTextView* view, double x, double y);
+  // The whitespace-delimited word under a point of a receive pane (widget coordinates).
+  bool rxTokenAt(GtkTextView* view, double x, double y, GtkTextIter* start, GtkTextIter* end, std::string* text);
+  void prepareOtherShift(GtkTextView* view, double x, double y);   // on right-click: offer the other shift's reading
+  void applyOtherShift();                                          // menu item: rewrite the word in the pane
   void exportAdif();
   void toast(const std::string& msg);
   void showAudioProblem(const std::string& msg);   // empty hides the banner
@@ -181,6 +185,8 @@ class MainWindow {
   static void onTxToggled(GtkToggleButton* b, gpointer self);
   static void onTxBufferChanged(GtkTextBuffer*, gpointer self);
   static void onRxClicked(GtkGestureClick* g, int n, double x, double y, gpointer self);
+  static void onRxSecondaryPressed(GtkGestureClick* g, int n, double x, double y, gpointer self);
+  static gboolean onRxQueryTooltip(GtkWidget* view, int x, int y, gboolean keyboard, GtkTooltip* tip, gpointer self);
   static void onMacroClicked(GtkButton* b, gpointer self);
   static void onMacroRightClick(GtkGestureClick* g, int n, double x, double y, gpointer self);
   static gboolean onShortcut(GtkWidget*, GVariant* args, gpointer self);
@@ -269,6 +275,11 @@ class MainWindow {
   GtkWidget* statusLabel_ = nullptr;
   std::vector<GtkWidget*> rxViews_;
   std::vector<GtkTextBuffer*> rxBufs_;
+  // The word last right-clicked, when it has another reading in the other Baudot shift.
+  GtkTextBuffer* shiftFixBuf_ = nullptr;
+  GtkTextMark* shiftFixStart_ = nullptr;
+  GtkTextMark* shiftFixEnd_ = nullptr;
+  std::string shiftFixFrom_, shiftFixTo_;
   std::vector<GtkTextMark*> rxEndMarks_;
   std::vector<std::string> rxWord_;
   std::vector<GtkTextTag*> callTags_;
