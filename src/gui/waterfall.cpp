@@ -135,11 +135,13 @@ void Waterfall::addSpectrum(const std::vector<float>& db, double binHz) {
   gint64 now = g_get_monotonic_time();
   double dt = lastSpectrumUs_ ? (now - lastSpectrumUs_) / 1e6 : 0.0;
   lastSpectrumUs_ = now;
-  float fl = noise_.update(db.data() + b0, b1 - b0, binHz, dt);
-  floorDb_ = 0.95f * floorDb_ + 0.05f * fl;
-  float peak = *std::max_element(db.begin() + b0, db.begin() + b1);
-  float desired = std::max(30.f, peak - floorDb_ + 6.f);
-  rangeDb_ = 0.95f * rangeDb_ + 0.05f * desired;
+  if (!txHold_.update(transmitting_, now / 1e6)) {
+    float fl = noise_.update(db.data() + b0, b1 - b0, binHz, dt);
+    floorDb_ = 0.95f * floorDb_ + 0.05f * fl;
+    float peak = *std::max_element(db.begin() + b0, db.begin() + b1);
+    float desired = std::max(30.f, peak - floorDb_ + 6.f);
+    rangeDb_ = 0.95f * rangeDb_ + 0.05f * desired;
+  }
 
   // Scroll down one row.
   cairo_surface_flush(surf_);

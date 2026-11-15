@@ -98,6 +98,43 @@ int main() {
     CHECK(worst < -55.f);
   }
 
+  // Issue #43: transmitting mutes the receive audio. Learning that silence as the floor
+  // left the waterfall all yellow for minutes after going back to receive (the settled
+  // levels follow down at once but up at 0.2 dB/s). Held while keyed, the floor is right
+  // on the first frame after.
+  {
+    const std::vector<float> band = frame(1700, 2100, -60, -110);
+    const std::vector<float> muted = frame(0, 1e9, -135, -135);
+    auto run = [&](bool hold) {
+      NoiseFloorTracker t;
+      TransmitHold h;
+      double now = 0;
+      float fl = 0;
+      auto step = [&](const std::vector<float>& db, bool keyed) {
+        now += kDt;
+        if (!(hold && h.update(keyed, now))) fl = t.update(db.data(), kBins, kBinHz, kDt);
+      };
+      for (int i = 0; i < 100; ++i) step(band, false);
+      for (int i = 0; i < 120; ++i) step(muted, true);    // 10 s over
+      step(muted, false);                                 // still muted as the rig unkeys
+      for (int i = 0; i < 3; ++i) step(band, false);
+      return fl;
+    };
+    CHECK(run(false) < -90.f);              // the bug: stopband taken for the floor
+    CHECK(std::abs(run(true) - -60.f) < 4.f);
+  }
+
+  // The hold lasts while keyed and for its tail after, then lets go.
+  {
+    TransmitHold h;
+    CHECK(!h.update(false, 0.0));
+    CHECK(h.update(true, 1.0));
+    CHECK(h.update(true, 5.0));
+    CHECK(h.update(false, 5.1));
+    CHECK(h.update(false, 5.0 + TransmitHold::kTailSec - 0.01));
+    CHECK(!h.update(false, 5.0 + TransmitHold::kTailSec + 0.2));
+  }
+
   // A different slice size starts over rather than reading stale blocks.
   {
     NoiseFloorTracker t;

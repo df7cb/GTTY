@@ -63,4 +63,23 @@ class NoiseFloorTracker {
   float floor_ = -80.f;
 };
 
+// Whether a waterfall should hold its level instead of learning from the spectrum: while
+// transmitting, the receive audio is muted (or, full duplex, our own signal), neither of
+// which is the band. The hold lasts kTailSec past unkeying, for the rig to bring its
+// receiver back and for spectra already computed from the muted audio (issue #43).
+class TransmitHold {
+ public:
+  static constexpr double kTailSec = 1.0;
+  // keyed: transmitting now. nowSec: a monotonic clock. Returns true to hold.
+  bool update(bool keyed, double nowSec) {
+    if (keyed) { keyed_ = true; return true; }
+    if (keyed_) { keyed_ = false; until_ = nowSec + kTailSec; }
+    return nowSec < until_;
+  }
+
+ private:
+  bool keyed_ = false;
+  double until_ = -1e9;
+};
+
 }  // namespace gtty
