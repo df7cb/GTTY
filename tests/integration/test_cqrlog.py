@@ -175,8 +175,10 @@ class Polling(CqrlogCase):
         self.assertTrue(wait_for(lambda: station.rpc().rig.get_frequency() == 14085500.0, 5))
         ok, khz = self.cqr.poll("log.get_frequency")
         self.assertRegex(khz, r"^\d+\.\d+$")
-        self.assertAlmostEqual(float(khz), 14085.5, places=3)
-        self.assertEqual(self.cqr.tim_time()["frequency"], "14.08550")
+        # The station being received, not the dial: its mark, 2125 Hz below a lower
+        # sideband dial (give or take what AFC has wandered with nothing on the air).
+        self.assertAlmostEqual(float(khz), 14085.5 - 2.125, delta=0.2)
+        self.assertEqual(self.cqr.tim_time()["frequency"], "%.5f" % (float(khz) / 1000.0))
 
     def test_date_and_times_have_the_widths_cqrlog_cuts(self):
         rec = self.cqr.tim_time()

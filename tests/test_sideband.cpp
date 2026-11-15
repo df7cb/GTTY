@@ -1,5 +1,7 @@
 // Following the rig's sideband: on the upper sideband the audio is mirrored, so the
 // same tone pair is used with mark and space exchanged.
+#include <cmath>
+
 #include "check.h"
 #include "rtty_sim.h"
 
@@ -61,5 +63,27 @@ int main() {
   CHECK(demodulate(onLsb, fs, lsb, true).find(sent) != std::string::npos);
   CHECK(demodulate(onLsb, fs, usb, true).find("DL1ABC") == std::string::npos);
 
+  // ----------------------------------------------- where a station is: its mark frequency
+  // Issue #31: dial 7039.2 kHz on USB, the 2125/2295 pair, AFC at +6 Hz. On the upper
+  // sideband the mark is the higher tone, and the Reverse Beacon Network has the station
+  // on 7041.5 kHz.
+  {
+    RttyParams onUsb = RttyParams{}.swappedTones();
+    CHECK_EQ(std::lround(markRadioFrequency(7039200.0, "USB", false, onUsb.markFreq, 6.0)), 7041501L);
+    CHECK_EQ(std::lround(markRadioFrequency(7039200.0, "PKTUSB", false, onUsb.markFreq, 6.0)), 7041501L);
+    // The same station on the lower sideband: the dial is above it, the mark is the lower tone.
+    RttyParams onLsb;
+    CHECK_EQ(std::lround(markRadioFrequency(7043626.0, "LSB", true, onLsb.markFreq, 0.0)), 7041501L);
+    CHECK_EQ(std::lround(markRadioFrequency(7043626.0, "LSB", true, onLsb.markFreq, 6.0)), 7041495L);   // audio up is RF down
+    // No rig: the dial typed in is taken as a lower sideband one.
+    CHECK_EQ(std::lround(markRadioFrequency(7043626.0, "", true, onLsb.markFreq, 0.0)), 7041501L);
+    // The rig's RTTY modes read the mark frequency on the dial; AFC is all that is added.
+    CHECK_EQ(std::lround(markRadioFrequency(7041501.0, "RTTY", true, onLsb.markFreq, 0.0)), 7041501L);
+    CHECK_EQ(std::lround(markRadioFrequency(7041501.0, "RTTY", true, onLsb.markFreq, 6.0)), 7041495L);
+    CHECK_EQ(std::lround(markRadioFrequency(7041501.0, "RTTYR", false, onLsb.markFreq, 6.0)), 7041507L);
+    // AFC is rarely on a whole Hz; the distance from the dial is.
+    CHECK_EQ(markRadioFrequency(7039200.0, "USB", false, onUsb.markFreq, 6.4), 7041501.0);
+    CHECK_EQ(markRadioFrequency(7041501.0, "RTTY", true, onLsb.markFreq, -0.3), 7041501.0);
+  }
   TEST_MAIN_END();
 }
