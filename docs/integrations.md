@@ -5,7 +5,7 @@ nav_order: 13
 
 # Integrations
 
-gtty talks to other station software four ways, all set up under *Preferences → Integration*:
+gtty talks to other station software five ways, all set up under *Preferences → Integration*:
 
 | Interface | Direction | Used by |
 |---|---|---|
@@ -13,6 +13,7 @@ gtty talks to other station software four ways, all set up under *Preferences �
 | [fldigi-compatible XML-RPC server](#fldigi-compatible-xml-rpc) | a logger drives gtty as its modem | TLF, Not1MM, CQRLOG |
 | [Logbook server](#logbook-server-fllog-qlog) | gtty hands each logged QSO to a logbook | fllog, QLog |
 | [Skimmer spot feed](#skimmer-spot-feed) | loggers connect to gtty as to a DX cluster | TLF, Not1MM, QLog and other band maps |
+| [PSK Reporter](#psk-reporter) | gtty reports the stations it decodes | the pskreporter.info map |
 
 ## GridTracker2 and the WSJT-X UDP protocol
 
@@ -213,3 +214,19 @@ DX de WA8Q-#:    14083.5  DL1ABC       RTTY  45 BPS  CQ               1234Z
 A station is spotted when its callsign follows `DE` or `CQ`, or has been received twice, so that a callsign garbled by noise is not spotted. It is spotted again after five minutes, or sooner if it moves by more than 500 Hz. Your own callsign is never spotted, and nothing is spotted while you transmit.
 
 A client that connects is asked to log in (`login:`); any callsign is accepted. It is then sent the last 40 spots, and `sh/dx` sends them again. Other cluster commands, such as filters, are accepted and ignored.
+
+## PSK Reporter
+
+gtty can report the stations it decodes to [PSK Reporter](https://pskreporter.info), as WSJT-X and fldigi do, so they appear on its map with you as the receiver.
+
+### Setup
+
+1. Set your callsign and grid locator under *Preferences → Station*. Both are required.
+2. Connect the rig (*Preferences → Rig*). Reports carry the station's RF frequency, so nothing is reported from the manual dial frequency.
+3. *Preferences → Integration → PSK Reporter*: tick **Report decoded stations**.
+
+### What is reported
+
+Stations identified by the primary receiver (the **Best guess** text) and, when it is on, by the [Skimmer](decoders.md#skimmer), by the same rules as the [skimmer spot feed](#what-is-sent): a callsign that follows `DE` or `CQ`, or has been received twice. Your own callsign is never reported, and nothing is reported while you transmit.
+
+Each report gives the callsign, its mark frequency, the mode `RTTY` and the time. A station is reported once per band every five minutes. Reports are batched and sent over UDP to `report.pskreporter.info` port 4739 at most every five minutes, with one sent at once when reporting starts; anything still queued is sent when gtty closes or reporting is turned off.

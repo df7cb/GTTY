@@ -39,6 +39,7 @@ struct Prefs {
   GtkWidget *rpcEnabled, *rpcBind, *rpcPort;
   GtkWidget *fllogEnabled, *fllogHost, *fllogPort;
   GtkWidget *spotEnabled, *spotBind, *spotPort;
+  GtkWidget* pskrEnabled;
   GtkWidget *myCall, *myName, *myQth, *myGrid;
   GtkWidget *scpPath, *logPath, *wfLo, *wfHi, *wfDir, *fontSize, *theme, *modemOnly;
   GtkWidget *gtEnabled, *gtHost, *gtPort, *gtDecodes, *gtLogged, *gtReply;
@@ -194,6 +195,7 @@ void onClosed(AdwDialog*, gpointer p) {
   s.spotServerEnabled = active(pr->spotEnabled);
   s.spotServerBind = text(pr->spotBind);
   s.spotServerPort = static_cast<int>(value(pr->spotPort));
+  s.pskReporterEnabled = active(pr->pskrEnabled);
 
   s.myCall = text(pr->myCall);
   s.myName = text(pr->myName);
@@ -501,6 +503,9 @@ void showPrefsDialog(GtkWidget* parent, Settings& s, std::function<void()> onApp
                              "Loggers connect as to a DX cluster and get a spot for every station the Skimmer identifies. Needs the Skimmer on");
     pr->spotBind = entry(g5, "Bind address", s.spotServerBind);
     pr->spotPort = spin(g5, "Port", 1, 65535, 1, s.spotServerPort);
+    GtkWidget* g6 = group(pg, "PSK Reporter");
+    pr->pskrEnabled = toggle(g6, "Report decoded stations", s.pskReporterEnabled,
+                             "Stations the receiver and the Skimmer identify appear on pskreporter.info. Needs your callsign and grid");
   }
 
   g_signal_connect(dlg, "closed", G_CALLBACK(onClosed), pr);

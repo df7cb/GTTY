@@ -17,6 +17,7 @@
 #include "core/macros.h"
 #include "core/net/cluster_client.h"
 #include "core/net/fllog_client.h"
+#include "core/net/psk_reporter.h"
 #include "core/net/spot_server.h"
 #include "core/net/wsjtx_udp.h"
 #include "core/net/xmlrpc_server.h"
@@ -183,6 +184,8 @@ class MainWindow {
   void fllogReportQso(const Qso& q);
   void openSpotServer();
   void spotSkimmed(const std::string& text, double markHz);
+  void openPskReporter();
+  void pskReportRx(char c);
   void gtHandle(const wsjtx::Incoming& in);
 
   // callbacks
@@ -319,6 +322,8 @@ class MainWindow {
   xmlrpc::Server rpc_;
   FllogForwarder fllog_;
   SpotServer spotServer_;
+  PskReporter pskr_;
+  std::string pskrRxText_;                    // recent text of the primary decoder, for PSK Reporter
   struct SentSpot { double freqHz; int64_t at; };
   std::map<std::string, SentSpot> sentSpots_;   // callsign -> where and when it was last spotted
   std::string rpcRigName_;
