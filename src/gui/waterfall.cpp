@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <ctime>
 
 namespace gtty {
 
@@ -67,6 +68,8 @@ void Waterfall::setReversed(bool reversed) {
 // The history no longer lines up with the new scale: blank it, keep the surface.
 void Waterfall::blankHistory() {
   labels_.clear();
+  marks_.clear();
+  lastTimeSlot_ = -1;
   if (surf_) {
     cairo_t* cr = cairo_create(surf_);
     cairo_set_source_rgb(cr, 0, 0, 0.08);
@@ -135,6 +138,7 @@ void Waterfall::addSpectrum(const std::vector<float>& db, double binHz) {
   gint64 now = g_get_monotonic_time();
   double dt = lastSpectrumUs_ ? (now - lastSpectrumUs_) / 1e6 : 0.0;
   lastSpectrumUs_ = now;
+  if (dt > 0 && dt < 2) rowsPerSec_ = rowsPerSec_ > 0 ? 0.9 * rowsPerSec_ + 0.1 / dt : 1 / dt;
   if (!txHold_.update(transmitting_, now / 1e6)) {
     float fl = noise_.update(db.data() + b0, b1 - b0, binHz, dt);
     floorDb_ = 0.95f * floorDb_ + 0.05f * fl;
@@ -151,6 +155,9 @@ void Waterfall::addSpectrum(const std::vector<float>& db, double binHz) {
   ++rows_;
   labels_.erase(std::remove_if(labels_.begin(), labels_.end(), [&](const CallLabel& l) { return rows_ - l.row > sh_; }),
                 labels_.end());
+  marks_.erase(std::remove_if(marks_.begin(), marks_.end(), [&](const RowMark& m) { return rows_ - m.row > sh_; }),
+               marks_.end());
+  addTimeMark();
   // Draw the new top row: for each pixel take the max over the bins it spans.
   for (int x = 0; x < sw_; ++x) {
     double f0 = std::min(xToHz(x, sw_), xToHz(x + 1, sw_)), f1 = std::max(xToHz(x, sw_), xToHz(x + 1, sw_));
@@ -161,6 +168,59 @@ void Waterfall::addSpectrum(const std::vector<float>& db, double binHz) {
     colormap(v, data + x * 4);
   }
   cairo_surface_mark_dirty(surf_);
+  gtk_widget_queue_draw(area_);
+}
+
+std::string Waterfall::formatRf(double hz) {
+  long v = std::lround(hz);
+  char buf[32];
+  snprintf(buf, sizeof buf, "%ld.%03ld.%02ld", v / 1000000, (v / 1000) % 1000, (v % 1000) / 10);
+  return buf;
+}
+
+// A UTC time stamp on the new top row whenever the clock crosses a whole interval, the
+// interval chosen so the stamps sit about 60 px apart at the current scroll rate.
+void Waterfall::addTimeMark() {
+  static constexpr int kSteps[] = {5, 10, 15, 30, 60, 120, 300, 600, 1800, 3600};
+  if (rowsPerSec_ <= 0) return;
+  // Re-pick only when too dense or when a shorter step has plenty of room, so the
+  // interval doesn't flap with small changes in the rate.
+  int idx = 0;
+  while (idx < 9 && kSteps[idx] != timeInterval_) ++idx;
+  bool tooDense = timeInterval_ == 0 || timeInterval_ * rowsPerSec_ < 40;
+  bool roomy = timeInterval_ != 0 && idx > 0 && kSteps[idx - 1] * rowsPerSec_ >= 80;
+  if (tooDense || roomy) {
+    int iv = kSteps[9];
+    for (int s : kSteps) if (s * rowsPerSec_ >= 60) { iv = s; break; }
+    if (iv != timeInterval_) { timeInterval_ = iv; lastTimeSlot_ = -1; }
+  }
+  int64_t sec = g_get_real_time() / G_USEC_PER_SEC;
+  int64_t slot = sec / timeInterval_;
+  if (lastTimeSlot_ >= 0 && slot != lastTimeSlot_) {
+    time_t t = static_cast<time_t>(slot * timeInterval_);
+    struct tm tmv;
+    gmtime_r(&t, &tmv);
+    char buf[16];
+    strftime(buf, sizeof buf, timeInterval_ < 60 ? "%H:%M:%S" : "%H:%MZ", &tmv);
+    marks_.push_back({rows_, buf, false});
+  }
+  lastTimeSlot_ = slot;
+}
+
+void Waterfall::setDialHz(double hz) {
+  if (hz <= 0) return;
+  if (dialHz_ > 0 && std::fabs(hz - dialHz_) >= 1 && rows_ > 0) {
+    // Turning the VFO knob reports many steps: keep one mark for the move.
+    auto last = std::find_if(marks_.rbegin(), marks_.rend(), [](const RowMark& m) { return m.dial; });
+    double mergeRows = std::max(20.0, 2.0 * rowsPerSec_);   // about two seconds
+    if (last != marks_.rend() && rows_ - last->row < mergeRows) {
+      last->row = rows_;
+      last->text = formatRf(hz);
+    } else {
+      marks_.push_back({rows_, formatRf(hz), true});
+    }
+  }
+  dialHz_ = hz;
   gtk_widget_queue_draw(area_);
 }
 
@@ -242,6 +302,73 @@ void Waterfall::draw(GtkDrawingArea*, cairo_t* cr, int w, int h, gpointer p) {
   cursor(self->mark_, 1, 0.3, 0.3, false);
   cursor(self->space_, 0.3, 0.6, 1, false);
   cairo_set_dash(cr, nullptr, 0, 0);
+  // Time stamps and dial changes, clipped to the waterfall.
+  if (!self->marks_.empty()) {
+    cairo_save(cr);
+    cairo_rectangle(cr, 0, sh, w, h - sh);
+    cairo_clip(cr);
+    cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+    cairo_set_font_size(cr, 10);
+    for (const auto& m : self->marks_) {
+      double y = sh + static_cast<double>(self->rows_ - m.row) + 0.5;
+      cairo_text_extents_t ext;
+      cairo_text_extents(cr, m.text.c_str(), &ext);
+      double bw = ext.x_advance + 6, bh = 13;
+      if (m.dial) {
+        // Dial moved: the history below was received on the old frequency.
+        double d[] = {6, 4};
+        cairo_set_dash(cr, d, 2, 0);
+        cairo_set_source_rgba(cr, 1, 0.65, 0.2, 0.8);
+        cairo_set_line_width(cr, 1.0);
+        cairo_move_to(cr, 0, y);
+        cairo_line_to(cr, w, y);
+        cairo_stroke(cr);
+        cairo_set_dash(cr, nullptr, 0, 0);
+        cairo_set_source_rgba(cr, 0.35, 0.2, 0.0, 0.85);
+        cairo_rectangle(cr, w - bw - 2, y, bw, bh);
+        cairo_fill(cr);
+        cairo_set_source_rgb(cr, 1, 0.8, 0.5);
+        cairo_move_to(cr, w - bw + 1, y + bh - 3);
+      } else {
+        cairo_set_source_rgba(cr, 1, 1, 1, 0.15);
+        cairo_set_line_width(cr, 1.0);
+        cairo_move_to(cr, 0, y);
+        cairo_line_to(cr, w, y);
+        cairo_stroke(cr);
+        cairo_set_source_rgba(cr, 0, 0, 0, 0.55);
+        cairo_rectangle(cr, 0, y, bw, bh);
+        cairo_fill(cr);
+        cairo_set_source_rgba(cr, 1, 1, 1, 0.8);
+        cairo_move_to(cr, 3, y + bh - 3);
+      }
+      cairo_show_text(cr, m.text.c_str());
+    }
+    cairo_restore(cr);
+  }
+  // Radio frequency of the mark, at the foot of the spectrum beside the mark cursor,
+  // on the side away from the space cursor.
+  if (self->radioFrequency) {
+    double rf = self->radioFrequency(self->mark_);
+    if (rf > 0) {
+      std::string text = formatRf(rf);
+      cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
+      cairo_set_font_size(cr, 11);
+      cairo_text_extents_t ext;
+      cairo_text_extents(cr, text.c_str(), &ext);
+      double bw = ext.x_advance + 8, bh = 15;
+      double mx = self->hzToX(self->mark_, w), sx = self->hzToX(self->space_, w);
+      double x = sx > mx ? mx - bw - 2 : mx + 2;
+      x = std::clamp(x, 0.0, std::max(0.0, w - bw));
+      double y = sh - bh - 2;
+      cairo_set_source_rgba(cr, 0.05, 0.05, 0.12, 0.85);
+      cairo_rectangle(cr, x, y, bw, bh);
+      cairo_fill(cr);
+      cairo_set_source_rgb(cr, 1, 0.55, 0.55);
+      cairo_move_to(cr, x + 4, y + bh - 4);
+      cairo_show_text(cr, text.c_str());
+      cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+    }
+  }
   // Callsign labels, clipped to the waterfall.
   if (!self->labels_.empty()) {
     cairo_save(cr);
@@ -277,11 +404,22 @@ void Waterfall::draw(GtkDrawingArea*, cairo_t* cr, int w, int h, gpointer p) {
   }
   // Hover readout
   if (self->hoverHz_ >= 0) {
-    char buf[32];
-    snprintf(buf, sizeof buf, "%.0f Hz", self->hoverHz_);
-    cairo_set_source_rgba(cr, 1, 1, 1, 0.8);
+    char buf[64];
+    double rf = self->radioFrequency ? self->radioFrequency(self->hoverHz_) : -1;
+    if (rf > 0)
+      snprintf(buf, sizeof buf, "%.0f Hz  %s", self->hoverHz_, formatRf(rf).c_str());
+    else
+      snprintf(buf, sizeof buf, "%.0f Hz", self->hoverHz_);
+    cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
     cairo_set_font_size(cr, 11);
-    cairo_move_to(cr, w - 70, sh - 6);
+    cairo_text_extents_t ext;
+    cairo_text_extents(cr, buf, &ext);
+    double x = w - ext.x_advance - 8;
+    cairo_set_source_rgba(cr, 0.05, 0.05, 0.12, 0.85);
+    cairo_rectangle(cr, x - 4, 17, ext.x_advance + 8, 15);
+    cairo_fill(cr);
+    cairo_set_source_rgba(cr, 1, 1, 1, 0.9);
+    cairo_move_to(cr, x, 28);
     cairo_show_text(cr, buf);
   }
 }
