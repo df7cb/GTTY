@@ -96,6 +96,25 @@ int main() {
     CHECK_EQ(std::lround(markRadioFrequency(7041501.0, "RTTY", true, onLsb.markFreq, 0.0)), 7041501L);
     CHECK_EQ(std::lround(markRadioFrequency(7041501.0, "RTTY", true, onLsb.markFreq, 6.0)), 7041495L);
     CHECK_EQ(std::lround(markRadioFrequency(7041501.0, "RTTYR", false, onLsb.markFreq, 6.0)), 7041507L);
+    // Issue #46: the Skimmer keeps a station's radio frequency and works out where it is
+    // heard now, after a QSY, or where to put the dial to hear it on the tones in use.
+    struct Case { double dial; const char* mode; bool lsb; double tone; };
+    for (const Case& k : {Case{7039200.0, "USB", false, onUsb.markFreq}, Case{7039200.0, "PKTUSB", false, onUsb.markFreq},
+                          Case{7043626.0, "LSB", true, onLsb.markFreq}, Case{7043626.0, "", true, onLsb.markFreq},
+                          Case{7041501.0, "RTTY", true, onLsb.markFreq}, Case{7041501.0, "RTTYR", false, onLsb.markFreq}}) {
+      for (double audio : {k.tone, k.tone + 37.0, 845.0, 2710.0}) {
+        double rf = markRadioFrequency(k.dial, k.mode, k.lsb, k.tone, audio - k.tone);
+        CHECK(std::fabs(audioMarkForRadioFrequency(rf, k.dial, k.mode, k.lsb, k.tone) - audio) < 0.51);
+      }
+      double dial = dialForMarkRadioFrequency(7041501.0, k.mode, k.lsb, k.tone);
+      CHECK(std::fabs(audioMarkForRadioFrequency(7041501.0, dial, k.mode, k.lsb, k.tone) - k.tone) < 1e-6);
+    }
+    // 10 kHz down on USB (the report): the station is heard 10 kHz higher, off the audio.
+    CHECK_EQ(audioMarkForRadioFrequency(7041501.0, 7029200.0, "USB", false, onUsb.markFreq), 12301.0);
+    CHECK_EQ(dialForMarkRadioFrequency(7041501.0, "USB", false, onUsb.markFreq), 7041501.0 - onUsb.markFreq);
+    CHECK_EQ(dialForMarkRadioFrequency(7041501.0, "LSB", true, onLsb.markFreq), 7041501.0 + onLsb.markFreq);
+    CHECK_EQ(dialForMarkRadioFrequency(7041501.0, "RTTY", true, onLsb.markFreq), 7041501.0);
+
     // AFC is rarely on a whole Hz; the distance from the dial is.
     CHECK_EQ(markRadioFrequency(7039200.0, "USB", false, onUsb.markFreq, 6.4), 7041501.0);
     CHECK_EQ(markRadioFrequency(7041501.0, "RTTY", true, onLsb.markFreq, -0.3), 7041501.0);
