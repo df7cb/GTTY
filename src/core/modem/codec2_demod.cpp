@@ -52,6 +52,8 @@ void Codec2Demod::configure(const DemodConfig& c) {
 #endif
   resampler_ = std::make_unique<Resampler>(cfg_.sampleRate, fs_);
   inBuf_.clear();
+  startPos_ = pos_;   // the buffered audio is dropped: start counting again from here
+  consumed_ = 0;
   syms_.clear();
   collecting_ = false;
   prevSym_ = 1.f;
@@ -59,6 +61,9 @@ void Codec2Demod::configure(const DemodConfig& c) {
 
 void Codec2Demod::reset() {
   inBuf_.clear();
+  if (resampler_) resampler_->reset();
+  startPos_ = pos_;
+  consumed_ = 0;
   syms_.clear();
   collecting_ = false;
   prevSym_ = 1.f;
@@ -119,8 +124,8 @@ void Codec2Demod::frame() {
   double fLow = fsk_->f_est[0], fHigh = fsk_->f_est[1];
   double markEst = markIsHigh_ ? fHigh : fLow;
   if (markEst > 0) afcHz_ = markEst - cfg_.params.markFreq;
-  // Each symbol i ended at input-clock sample framePos_ + (i+1)*ts_ scaled back to cfg_.sampleRate.
-  double scale = cfg_.sampleRate / fs_;
+  // Each symbol i ended consumed_ + (i+1)*ts_ samples into the resampled stream.
+  const double scale = cfg_.sampleRate / fs_;
   float sumMark = 0, sumSpace = 0;
   for (int i = 0; i < nsym_; ++i) {
     float low = filt[i], high = filt[static_cast<size_t>(nsym_) + i];
@@ -128,13 +133,13 @@ void Codec2Demod::frame() {
     sumMark += m; sumSpace += s;
     float soft = (m - s) / (m + s + 1e-6f);
     if (scope_.size() < 4096) scope_.push_back({std::min(1.f, m / (m + s + 1e-6f) * 1.4f), std::min(1.f, s / (m + s + 1e-6f) * 1.4f)});
-    uint64_t end = framePos_ + static_cast<uint64_t>((i + 1) * ts_ * scale);
+    uint64_t end = startPos_ + static_cast<uint64_t>(std::llround(static_cast<double>(consumed_ + (i + 1) * ts_) * scale));
     symbol(soft, end);
   }
   float tot = sumMark + sumSpace + 1e-6f;
   markLevel_ = std::min(1.f, sumMark / tot * 2);
   spaceLevel_ = std::min(1.f, sumSpace / tot * 2);
-  framePos_ += static_cast<uint64_t>(frameSamples_ * scale);
+  consumed_ += frameSamples_;
   inBuf_.erase(inBuf_.begin(), inBuf_.begin() + static_cast<long>(frameSamples_));
   frameSamples_ = fsk_nin(fsk_);
 #endif

@@ -48,7 +48,11 @@ class Codec2Demod : public RttyDemodulator {
   std::vector<float> inBuf_, resampled_;
   size_t frameSamples_ = 0;
   uint64_t pos_ = 0;                      // input samples (cfg_.sampleRate clock)
-  uint64_t framePos_ = 0;                 // input-clock sample index at the start of inBuf_
+  // Character times are on the input clock the other engines count, for the vote: the
+  // input sample at which the resampled stream began (configure, reset) plus the codec2-rate
+  // samples consumed since, converted once. Converting each frame and truncating drifted.
+  uint64_t startPos_ = 0;
+  uint64_t consumed_ = 0;                 // fs_-rate samples taken off inBuf_ since startPos_
   // half-bit symbol framer
   std::vector<float> syms_;               // soft symbols of the character being assembled (+ = mark)
   float prevSym_ = 1.f;
