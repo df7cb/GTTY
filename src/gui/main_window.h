@@ -241,7 +241,8 @@ class MainWindow {
   std::string pttText_;
   // A station the Skimmer heard, kept on the radio frequency it was heard on (issue #46):
   // a QSY moves where it is in the audio, not where it is on the band.
-  struct SkimEntry { double rfHz; std::string text, call; int64_t lastSeen; float quality; };
+  // runner: the station last heard calling CQ on this frequency, if any (issue #51).
+  struct SkimEntry { double rfHz; std::string text, call, runner; int64_t lastSeen; float quality; };
   std::vector<SkimEntry> skim_;
   bool skimDirty_ = false;
   int64_t skimRebuiltAt_ = 0;

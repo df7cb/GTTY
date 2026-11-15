@@ -94,7 +94,7 @@ nav_order: 16
 | GridTracker | 127.0.0.1:2237, off |
 | XML-RPC | 127.0.0.1:7362, off |
 | Logbook server | 127.0.0.1:8421, off |
-| Skimmer spot feed | 127.0.0.1:7300, off |
+| Skimmer spot feed | 127.0.0.1:7300, off; only stations calling CQ |
 | PSK Reporter | off |
 
 ## Files

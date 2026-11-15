@@ -88,6 +88,7 @@ struct Settings {
   bool skimmerEnabled = false;
   double skimmerStepHz = 50;  // channel spacing across the waterfall range
   bool skimmerWaterfallCalls = true;  // label identified stations on the waterfall
+  bool skimmerCqOnly = false;         // Skimmer list: only stations calling CQ
   // The radio's built-in decoder, read from the serial port it prints on (Icom "RTTY Decode")
   bool radioDecoderEnabled = false;
   std::string radioDecoderDevice;
@@ -130,6 +131,7 @@ struct Settings {
   bool spotServerEnabled = false;
   std::string spotServerBind = "127.0.0.1";
   int spotServerPort = 7300;
+  bool spotServerCqOnly = true;   // spot only stations calling CQ, as a band map wants (issue #51)
   // Report decoded stations to PSK Reporter (needs myCall and myGrid)
   bool pskReporterEnabled = false;
   // DX cluster / band map

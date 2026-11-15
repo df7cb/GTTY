@@ -65,9 +65,11 @@ During the first second of a new signal only one engine may have an opinion, so 
 
 The Skimmer runs a decoder every 50 Hz (configurable from 20 to 200 Hz) across the whole waterfall range, so every RTTY signal in the receiver passband is decoded at once. Turn it on with **Skimmer** in the menu or under *Preferences → Decoders*. It uses CPU in proportion to the passband width and the channel step.
 
-Stations appear in the **Skimmer** page of the sidebar, sorted by frequency, with the RF frequency computed from the dial and the sideband, the callsign found in the text (or **?** until one has been seen), the age of the last decode and the last few characters received. Rows are colored from the logbook: a new callsign in the accent color, a dupe on this band dimmed.
+Stations appear in the **Skimmer** page of the sidebar, sorted by frequency, with the RF frequency they were heard on (it stays put when you QSY), the callsign found in the text (or **?** until one has been seen), the age of the last decode and the last few characters received. Rows are colored from the logbook: a new callsign in the accent color, a dupe on this band dimmed.
 
-**Click a row** to move the decoders to that signal and put the callsign in the Call field. Entries disappear 90 seconds after the station was last heard.
+**Click a row** to move the decoders to that signal and put the callsign in the Call field; for a station no longer in the receiver's audio after a QSY, the rig is retuned onto it. Entries disappear 90 seconds after the station was last heard.
+
+Tick **CQ only** above the list to show only the stations calling CQ, with the runner's callsign, and not the stations answering them on the same frequency. A station stays in the list while it works the callers it got, until another station is heard calling CQ on that frequency.
 
 ### Callsigns on the waterfall
 
@@ -75,7 +77,7 @@ As in WSJT-X Improved and FT8CN, each station the Skimmer identifies is labelled
 
 | Label | Meaning |
 |---|---|
-| Green | Calling CQ or TEST |
+| Green | Calling CQ or TEST (the station calling, not one answering it) |
 | Red | Your callsign is in what it sent |
 | Grey | A dupe on this band in the logbook |
 | Dark | Anything else |

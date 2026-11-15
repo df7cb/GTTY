@@ -78,6 +78,35 @@ int main() {
     CHECK(!cq);
   }
 
+  // ----------------------------------------- who is calling CQ (issue #51)
+  // A band map wants the stations calling CQ. In a contest the callers answer on the
+  // runner's frequency, so one Skimmer channel hears both: the call to spot is the one
+  // that goes with the CQ, not whichever was heard last.
+  {
+    CHECK_EQ(cqCall("CQ TEST K5XOM K5XOM", "WA8Q"), std::string("K5XOM"));
+    CHECK_EQ(cqCall("CQ CQ DE K1ABC K1ABC K", "WA8Q"), std::string("K1ABC"));
+    CHECK_EQ(cqCall("CQ WAE N8CWU N8CWU WAE", "WA8Q"), std::string("N8CWU"));   // the contest's name in between
+    CHECK_EQ(cqCall("TU DF7C CQ", "WA8Q"), std::string("DF7C"));                 // the runner's "TU <call> CQ"
+    CHECK_EQ(cqCall("599 171 171 DL1ASA TU DF7C TEST ", "WA8Q"), std::string("DF7C"));
+    // A caller answering on the runner's frequency is not the one calling CQ.
+    CHECK_EQ(cqCall("CQ TEST K5XOM K5XOM\nDL1ASA DL1ASA\n", "WA8Q"), std::string("K5XOM"));
+    CHECK_EQ(cqCall("CQ TEST K5XOM K5XOM\nDL1ASA DL1ASA\nDL1ASA 599 123 123 K5XOM\n", "WA8Q"), std::string("K5XOM"));
+    CHECK_EQ(cqCall("DL1ASA DL1ASA\nDL1ASA 599 123 123\n", "WA8Q"), std::string(""));   // no CQ heard
+    CHECK_EQ(cqCall("W1AW DE K1ABC 599 001 001 K", "WA8Q"), std::string(""));
+    // The runner heard last wins (the channel has a new station on it).
+    CHECK_EQ(cqCall("CQ TEST K5XOM K5XOM\nCQ TEST JA1XYZ JA1XYZ\n", "WA8Q"), std::string("JA1XYZ"));
+    // Not until the call is complete and announced (after DE or TU, or sent twice), as for
+    // any spot: noise spells callsign-like words. Never ourselves.
+    CHECK_EQ(cqCall("CQ TEST K5XO", "WA8Q"), std::string(""));
+    CHECK_EQ(cqCall("CQ TEST K5XOM", "WA8Q"), std::string(""));
+    CHECK_EQ(cqCall("CQ TEST K5XOM K", "WA8Q"), std::string(""));
+    CHECK_EQ(cqCall("CQ TEST K5XOM K5XOM", "WA8Q"), std::string("K5XOM"));
+    CHECK_EQ(cqCall("CQ TEST DE K5XOM K", "WA8Q"), std::string("K5XOM"));
+    CHECK_EQ(cqCall("CQ TEST WA8Q WA8Q", "wa8q"), std::string(""));
+    CHECK_EQ(cqCall("QX5RT CQ VVMZ 4KQ", "WA8Q"), std::string(""));
+    CHECK_EQ(cqCall("", "WA8Q"), std::string(""));
+  }
+
   // ------------------------------------------------- server, through a client
   SpotServer server;
   uint16_t port = 0;
