@@ -1024,6 +1024,8 @@ void MainWindow::handle(const Event& e) {
   if (auto* t = std::get_if<RxTextEvent>(&e)) {
     appendRx(t->slot, t->text);
   } else if (auto* s = std::get_if<SpectrumEvent>(&e)) {
+    // Keyed by gtty, or by anything else the rig reports (a logger through rigctld, the rig's own keyer).
+    wf_.setTransmitting(tx_.transmitting() || (rigState_.connected && rigState_.ptt));
     wf_.addSpectrum(s->db, s->binHz);
   } else if (auto* sc = std::get_if<ScopeEvent>(&e)) {
     if (sc->slot == 0) scope_.addPoints(sc->points);

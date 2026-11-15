@@ -48,6 +48,8 @@ Right-click tuning is the contester's way: the signal lands on the nominal tones
 
 The direction of the waterfall follows the rig's sideband by default, so in RTTY-L the display reads like the rig's own scope with higher audio frequencies on the left. *Preferences → Station → Waterfall direction* can fix it to low-on-the-left or low-on-the-right. The displayed range (300–3000 Hz by default) is set on the same page; the Skimmer searches the same range.
 
+The waterfall sets its own brightness from the band noise inside the rig's passband, so a narrow receiver filter does not wash it out. While transmitting, whether gtty keys the rig or the rig reports it is keyed by something else, the waterfall keeps scrolling but holds that level, so the muted receiver is not learned as the band and the display is right as soon as you are back on receive.
+
 ## The XY scope
 
 The scope plots the filtered mark channel against the filtered space channel. A tuned signal draws two ellipses at right angles: one lights while mark is sent, the other while space is sent. When the pattern is tilted or one ellipse is missing, the signal is off the tones or the shift is wrong. The mark and space levels also set the brightness of the two ellipses.

@@ -25,6 +25,9 @@ class Waterfall {
   void setReversed(bool reversed);
   bool reversed() const { return reversed_; }
   void addSpectrum(const std::vector<float>& db, double binHz);
+  // Transmitting: keep scrolling, but hold the level instead of learning the muted
+  // receiver (or our own signal) as the band (issue #43).
+  void setTransmitting(bool on) { transmitting_ = on; }
 
   // Left click or drag: desired center of the tone pair (Hz). Right click: same, for rig retune.
   // Scroll wheel: nudge by deltaHz.
@@ -85,6 +88,8 @@ class Waterfall {
   double binHz_ = 1;
   float floorDb_ = -80, rangeDb_ = 60;  // auto-tracked
   NoiseFloorTracker noise_;
+  TransmitHold txHold_;
+  bool transmitting_ = false;
   gint64 lastSpectrumUs_ = 0;
   double hoverHz_ = -1;
   std::vector<double> notches_;
