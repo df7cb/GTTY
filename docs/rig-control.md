@@ -36,7 +36,7 @@ Only one program may use the CAT port at a time. Close other rig control softwar
 
 ## Receiver filter and IF shift
 
-The **Filter** dropdown under the tuning scope selects the receiver filter width from 250 Hz to 3000 Hz. *Rig* leaves whatever the rig has. The dropdown follows the width the rig reports, so a change made on the front panel is reflected. **IF shift** moves the passband in 50 Hz steps when the rig supports it; the row is hidden otherwise.
+The **Filter** dropdown under the tuning scope selects the receiver filter width from 250 Hz to 3000 Hz. *Rig* leaves whatever the rig has. The dropdown follows the width the rig reports, so a change made on the front panel is reflected. Not every rig has every width, and Hamlib does not say when a rig turns one down, so gtty reads the width back a second or two after setting it: if the rig is on another width, the dropdown shows that one and a toast names both. Another program that shares the rig and sets its mode can cause the same. **IF shift** moves the passband in 50 Hz steps when the rig supports it; the row is hidden otherwise.
 
 **Filter width to select on connect** under *Preferences → Rig* applies a width automatically whenever the rig connects, for example 500 Hz for RTTY. 0 leaves the rig alone.
 

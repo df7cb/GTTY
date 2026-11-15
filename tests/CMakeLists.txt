@@ -1,4 +1,4 @@
-foreach(t test_baudot test_modem test_macros test_callsign test_wsjtx test_xmlrpc test_sockets test_cluster test_callbook test_cw test_voter test_codec2 test_skimmer test_spots test_fllog test_ptt test_line_breaks test_noise_floor test_rx_highlight test_trailing_noise test_sideband test_rig_decode_port)
+foreach(t test_baudot test_modem test_macros test_callsign test_wsjtx test_xmlrpc test_sockets test_cluster test_callbook test_cw test_voter test_codec2 test_skimmer test_spots test_fllog test_ptt test_line_breaks test_noise_floor test_rx_highlight test_trailing_noise test_sideband test_rig_decode_port test_rig_width)
   add_executable(${t} ${t}.cpp)
   target_link_libraries(${t} PRIVATE gttycore)
   add_test(NAME ${t} COMMAND ${t})
@@ -11,6 +11,16 @@ if(GLIB_FOUND)
   target_include_directories(test_profiles PRIVATE ${CMAKE_SOURCE_DIR}/src/gui)
   target_link_libraries(test_profiles PRIVATE gttycore PkgConfig::GLIB)
   add_test(NAME test_profiles COMMAND test_profiles)
+endif()
+
+# GTK text buffer behaviour of the receive panes. Needs a display: skipped without one.
+pkg_check_modules(GTK4 IMPORTED_TARGET gtk4)
+if(GTK4_FOUND)
+  add_executable(test_text_append test_text_append.cpp)
+  target_include_directories(test_text_append PRIVATE ${CMAKE_SOURCE_DIR}/src/gui)
+  target_link_libraries(test_text_append PRIVATE PkgConfig::GTK4)
+  add_test(NAME test_text_append COMMAND test_text_append)
+  set_tests_properties(test_text_append PROPERTIES SKIP_RETURN_CODE 77)
 endif()
 
 # gtty driven by Not1MM's own fldigi and rigctld clients (tests/integration).
