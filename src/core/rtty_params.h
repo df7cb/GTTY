@@ -51,4 +51,19 @@ struct RttyParams {
 // sends reversed, and following it would undo that.
 inline bool isUpperSidebandMode(const std::string& mode) { return mode == "USB" || mode == "PKTUSB"; }
 
+// The radio frequency of a signal's mark tone, which is where an RTTY station is said to
+// be: the frequency a spot or the Reverse Beacon Network gives, and what fldigi puts in
+// its log row. `markToneHz` is the audio mark tone in use and `afcHz` how far AFC has
+// followed the signal off it. On a sideband the tone is that far from the dial, above it
+// or below. In the rig's own RTTY modes (FSK) the dial already reads the mark frequency
+// of a signal on the tones, so only the AFC offset counts. The distance from the dial is
+// in whole Hz: a logger that takes the difference to the dial and applies it back (TLF,
+// to QSY) then lands on the Hz it asked for.
+inline double markRadioFrequency(double dialHz, const std::string& rigMode, bool lowerSideband,
+                                 double markToneHz, double afcHz) {
+  const bool fsk = rigMode == "RTTY" || rigMode == "RTTYR";
+  const double audio = std::round((fsk ? 0.0 : markToneHz) + afcHz);
+  return lowerSideband ? dialHz - audio : dialHz + audio;
+}
+
 }  // namespace gtty

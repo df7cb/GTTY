@@ -203,13 +203,39 @@ class Polling(TlfCase):
     def test_log_frequency_is_in_khz(self):
         station.rpc().rig.set_frequency(14085000.0)
         self.assertTrue(wait_for(lambda: station.rpc().rig.get_frequency() == 14085000.0, 5))
-        self.assertAlmostEqual(self.tlf.get_log_frequency(), 14085000.0, delta=1)
+        # kHz, not Hz or MHz: within an audio passband of the dial.
+        self.assertAlmostEqual(self.tlf.get_log_frequency(), 14085000.0, delta=4000)
+
+    def test_log_frequency_is_the_station_not_the_dial(self):
+        # TLF takes log.get_frequency for where the station is, the frequency the Reverse
+        # Beacon Network reports: its mark. On the upper sideband that is the higher tone,
+        # above the dial (issue #31).
+        rpc = station.rpc()
+        rpc.rig.set_mode("USB")
+        if not wait_for(lambda: station.rpc().rig.get_mode() == "USB", 5):
+            self.skipTest("the radio is not on USB (no rigctld)")
+        try:
+            rpc.rig.set_frequency(7039200.0)
+            self.assertTrue(wait_for(lambda: station.rpc().rig.get_frequency() == 7039200.0, 5))
+            mark = rpc.modem.get_carrier() + 170 // 2
+            self.assertTrue(wait_for(
+                lambda: abs(self.tlf.get_log_frequency() - (7039200.0 + station.rpc().modem.get_carrier() + 85)) <= 1, 5),
+                f"log {self.tlf.get_log_frequency()} Hz, dial 7039200 Hz, mark tone {mark} Hz")
+            # In the rig's own RTTY mode the dial reads the mark frequency already.
+            rpc.rig.set_mode("RTTY")
+            self.assertTrue(wait_for(lambda: station.rpc().rig.get_mode() == "RTTY", 5))
+            self.assertTrue(wait_for(lambda: abs(self.tlf.get_log_frequency() - 7039200.0) <= 30, 5),
+                            f"log {self.tlf.get_log_frequency()} Hz in RTTY mode")
+        finally:
+            rpc.rig.set_mode("RTTY")
+            wait_for(lambda: station.rpc().rig.get_mode() == "RTTY", 5)
 
     def test_tlf_qsy_lands_on_the_requested_frequency(self):
         self.tlf.set_log_frequency(7043500)
         self.assertTrue(wait_for(lambda: abs(self.tlf.get_log_frequency() - 7043500) < 1, 5),
                         f"TLF reads {self.tlf.get_log_frequency()} Hz")
-        self.assertEqual(station.rpc().rig.get_frequency(), 7043500.0)
+        # The dial is beside it by what AFC has moved off the tones (the radio is in RTTY).
+        self.assertAlmostEqual(station.rpc().rig.get_frequency(), 7043500.0, delta=30)
 
     def test_auto_qsy_brings_the_tones_back_once(self):
         rpc = station.rpc()

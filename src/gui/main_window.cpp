@@ -2600,8 +2600,16 @@ xmlrpc::Value MainWindow::rpcDispatch(const std::string& m, const std::vector<xm
     return V::string(buf);
   }
   if (m == "log.set_serial_number") { gtk_spin_button_set_value(GTK_SPIN_BUTTON(serialSpin_), arg(0).asDouble()); return V::nil(); }
-  // The Frequency field of fldigi's log row is in kHz; TLF and CQRLOG rely on it.
-  if (m == "log.get_frequency") { char buf[32]; snprintf(buf, sizeof buf, "%.3f", dialFreqHz() / 1000.0); return V::string(buf); }
+  // The Frequency field of fldigi's log row: the frequency of the station being received
+  // (its mark), not the dial, as text in kHz. TLF takes it for the rig's frequency and
+  // CQRLOG logs it.
+  if (m == "log.get_frequency") {
+    double hz = markRadioFrequency(dialFreqHz(), rigState_.connected ? rigState_.mode : "", lsbLike(),
+                                   activeRtty().markFreq, primaryAfc_);
+    char buf[32];
+    snprintf(buf, sizeof buf, "%.3f", hz / 1000.0);
+    return V::string(buf);
+  }
   if (m == "log.get_date_on" || m == "log.get_date_off") {   // YYYYMMDD
     std::string now = Logbook::nowUtc();
     return V::string(now.substr(0, 4) + now.substr(5, 2) + now.substr(8, 2));
