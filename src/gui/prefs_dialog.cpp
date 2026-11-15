@@ -48,17 +48,24 @@ struct Prefs {
 
 // The pages sit in a view stack in a window of their own: an AdwPreferencesDialog is
 // drawn inside the main window at a fixed size and cannot be resized (issue #50).
+// A page is a scrolled column of groups, spaced as an AdwPreferencesPage spaces them but
+// without its width limit (a clamp of about 600 px), so the rows widen with the window.
 GtkWidget* page(GtkWidget* stack, const char* title, const char* icon) {
-  GtkWidget* p = adw_preferences_page_new();
-  adw_preferences_page_set_title(ADW_PREFERENCES_PAGE(p), title);
-  adw_preferences_page_set_icon_name(ADW_PREFERENCES_PAGE(p), icon);
-  adw_view_stack_add_titled_with_icon(ADW_VIEW_STACK(stack), p, title, title, icon);
-  return p;
+  GtkWidget* column = gtk_box_new(GTK_ORIENTATION_VERTICAL, 24);
+  gtk_widget_set_margin_top(column, 24);
+  gtk_widget_set_margin_bottom(column, 24);
+  gtk_widget_set_margin_start(column, 12);
+  gtk_widget_set_margin_end(column, 12);
+  GtkWidget* scroll = gtk_scrolled_window_new();
+  gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scroll), GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
+  gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scroll), column);
+  adw_view_stack_add_titled_with_icon(ADW_VIEW_STACK(stack), scroll, title, title, icon);
+  return column;
 }
 GtkWidget* group(GtkWidget* pg, const char* title) {
   GtkWidget* g = adw_preferences_group_new();
   adw_preferences_group_set_title(ADW_PREFERENCES_GROUP(g), title);
-  adw_preferences_page_add(ADW_PREFERENCES_PAGE(pg), ADW_PREFERENCES_GROUP(g));
+  gtk_box_append(GTK_BOX(pg), g);
   return g;
 }
 GtkWidget* entry(GtkWidget* g, const char* title, const std::string& value) {
