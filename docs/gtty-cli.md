@@ -51,6 +51,8 @@ THE QUICK BROWN FOX ...
 
 ## Options
 
+An option gtty-cli does not know is an error (exit status 2), not a file name. Options take their value as the next argument: `--squelch 0.4`, not `--squelch=0.4`.
+
 ### Signal
 
 | Option | Meaning | Default |
@@ -62,7 +64,7 @@ THE QUICK BROWN FOX ...
 | `--stop N` | Stop bits for encoding | 1.5 |
 | `--rate HZ` | Sample rate for encoding, listening and recording | 48000 |
 | `--ustty` | US-TTY character set instead of ITA2 | ITA2 |
-| `--no-usos` | Do not unshift on space | unshift on |
+| `--usos`, `--no-usos` | Unshift on space, or not | unshift on |
 
 ### Decoder
 
