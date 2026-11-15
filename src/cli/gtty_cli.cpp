@@ -13,6 +13,7 @@
 //          decoder knobs: --filter-bits F --window 0|1 --atc-tau S --bit-window F --afc-gain G
 //                         --mode normal|selective|flutter --engines all --corr-edge F --corr-accept F
 //          --iq [--center HZ]  treat a stereo file as I/Q baseband (SDR recording)
+#include <cctype>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -58,6 +59,7 @@ struct Opts {
   bool iq = false;        // treat a stereo file as I/Q baseband
   double iqCenter = 0;    // audio frequency the baseband center is shifted to (0 = rate/4)
   std::vector<std::string> positional;
+  std::string badOption;  // the first unrecognised --option, if any
 };
 
 Opts parse(int argc, char** argv) {
@@ -83,6 +85,7 @@ Opts parse(int argc, char** argv) {
     else if (a == "--engines") o.allEngines = next() == "all";
     else if (a == "--corr-edge") o.corrEdge = atof(next().c_str());
     else if (a == "--corr-accept") o.corrAccept = atof(next().c_str());
+    else if (a == "--usos") o.params.unshiftOnSpace = true;
     else if (a == "--no-usos") o.params.unshiftOnSpace = false;
     else if (a == "--ustty") o.params.variant = BaudotVariant::USTTY;
     else if (a == "--in") o.inDev = atoi(next().c_str());
@@ -97,6 +100,10 @@ Opts parse(int argc, char** argv) {
     else if (a == "--quiet") o.quiet = true;
     else if (a == "--iq") o.iq = true;
     else if (a == "--center") o.iqCenter = atof(next().c_str());
+    // A mistyped option must not be taken for a file name ("No such file or directory").
+    else if (a.size() > 1 && a[0] == '-' && !isdigit(static_cast<unsigned char>(a[1])) && a[1] != '.') {
+      if (o.badOption.empty()) o.badOption = a;
+    }
     else o.positional.push_back(a);
   }
   return o;
@@ -317,6 +324,10 @@ int main(int argc, char** argv) {
     return 0;
   }
   Opts o = parse(argc, argv);
+  if (!o.badOption.empty()) {
+    std::cerr << "gtty-cli: unknown option '" << o.badOption << "'\n";
+    return 2;
+  }
   if (o.positional.empty()) {
     std::cerr << "usage: gtty-cli encode|decode|listen|devices|rigs|rig [options] | --version\n";
     return 2;

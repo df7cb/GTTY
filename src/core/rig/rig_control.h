@@ -44,6 +44,10 @@ struct RigState {
   // take. widthHz is what the rig has instead.
   int widthRefusedHz = 0;
   bool ptt = false;
+  // IF shift as the rig reports it (RIG_LEVEL_IF). ifShiftKnown is false when the backend
+  // cannot read it, so a control showing it has nothing to start from.
+  int ifShiftHz = 0;
+  bool ifShiftKnown = false;
   std::string error;
 };
 
@@ -116,6 +120,7 @@ class RigControl {
  private:
   void pollLoop();
   void setError(const std::string& e);
+  void readIfShift();   // with mu_ held
 
   void closeRig();
 

@@ -280,6 +280,8 @@ GtkWidget* MainWindow::buildScopeColumn() {
     gtk_label_set_xalign(GTK_LABEL(l2), 0.f);
     gtk_box_append(GTK_BOX(ifShiftRow_), l2);
     ifShiftSpin_ = gtk_spin_button_new_with_range(-1500, 1500, 50);
+    // A new spin button sits on its minimum; until the rig reports its IF shift, show none.
+    gtk_spin_button_set_value(GTK_SPIN_BUTTON(ifShiftSpin_), 0);
     gtk_editable_set_width_chars(GTK_EDITABLE(ifShiftSpin_), 4);
     gtk_widget_set_tooltip_text(ifShiftSpin_, "Rig IF shift / passband tuning (Hz)");
     g_signal_connect(ifShiftSpin_, "value-changed", G_CALLBACK(onIfShiftChanged), this);
@@ -1125,6 +1127,18 @@ void MainWindow::updateFreqDisplay(const RigState& s) {
     suppressControlEvents_ = true;
     gtk_drop_down_set_selected(GTK_DROP_DOWN(filterDrop_), sel);
     suppressControlEvents_ = false;
+  }
+  // And the IF shift control with the rig's IF shift, so a click steps from where the rig
+  // is (not from the control's range limit). Not while the operator is editing it.
+  if (s.ifShiftKnown && gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(ifShiftSpin_)) != s.ifShiftHz) {
+    GtkRoot* root = gtk_widget_get_root(ifShiftSpin_);
+    GtkWidget* focus = root ? gtk_root_get_focus(root) : nullptr;
+    bool editing = focus && (focus == ifShiftSpin_ || gtk_widget_is_ancestor(focus, ifShiftSpin_));
+    if (!editing) {
+      suppressControlEvents_ = true;
+      gtk_spin_button_set_value(GTK_SPIN_BUTTON(ifShiftSpin_), s.ifShiftHz);
+      suppressControlEvents_ = false;
+    }
   }
 }
 
@@ -2726,7 +2740,8 @@ xmlrpc::Value MainWindow::rpcDispatch(const std::string& m, const std::vector<xm
   if (m == "rig.get_mode") return V::string(rigState_.connected ? rigState_.mode : "RTTY");
   if (m == "rig.set_mode") { if (rig_.isOpen()) rig_.setMode(arg(0).asString()); return V::nil(); }
   if (m == "rig.get_bandwidths") return V::array({});
-  if (m == "rig.get_bandwidth") return V::string("");
+  if (m == "rig.get_bandwidth")
+    return V::string(rigState_.connected && rigState_.widthHz > 0 ? std::to_string(rigState_.widthHz) : "");
   if (m == "rig.take_control" || m == "rig.release_control") return V::nil();
   if (m == "rig.get_notch") return V::integer(notches_.empty() ? 0 : static_cast<int64_t>(notches_[0]));
   if (m == "rig.set_notch") { notches_.clear(); if (arg(0).asDouble() > 0) toggleNotch(arg(0).asDouble()); else clearNotches(); return V::nil(); }

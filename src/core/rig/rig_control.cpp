@@ -113,7 +113,19 @@ RigState RigControl::state() const {
   return state_;
 }
 
+// The IF shift is read on the first poll and then about once a second: often enough to
+// follow the rig's own knob, without adding a CAT query to every frequency poll.
+void RigControl::readIfShift() {
+  if (!rig_ || !rig_has_get_level(rig_, RIG_LEVEL_IF)) return;
+  value_t v{};
+  if (rig_get_level(rig_, RIG_VFO_CURR, RIG_LEVEL_IF, &v) == RIG_OK) {
+    state_.ifShiftHz = v.i;
+    state_.ifShiftKnown = true;
+  }
+}
+
 void RigControl::pollLoop() {
+  int sinceIfShift = 0;
   while (run_) {
     RigState snapshot;
     {
@@ -134,6 +146,11 @@ void RigControl::pollLoop() {
         ptt_t p = RIG_PTT_OFF;
         if (pttPort_.isOpen()) state_.ptt = pttPort_.get();
         else if (rig_get_ptt(rig_, RIG_VFO_CURR, &p) == RIG_OK) state_.ptt = p != RIG_PTT_OFF;
+        if (sinceIfShift <= 0) {
+          readIfShift();
+          sinceIfShift = std::max(1, 1000 / std::max(1, cfg_.pollMs));
+        }
+        --sinceIfShift;
       }
       snapshot = state_;
     }
@@ -201,7 +218,8 @@ bool RigControl::setIfShift(int hz) {
   value_t v;
   v.i = hz;
   int rc = rig_set_level(rig_, RIG_VFO_CURR, RIG_LEVEL_IF, v);
-  if (rc != RIG_OK) setError(rigerror2(rc));
+  if (rc == RIG_OK) { state_.ifShiftHz = hz; state_.ifShiftKnown = true; }
+  else setError(rigerror2(rc));
   return rc == RIG_OK;
 }
 
