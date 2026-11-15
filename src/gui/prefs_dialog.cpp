@@ -46,11 +46,13 @@ struct Prefs {
   std::vector<GtkWidget*> bandRows;
 };
 
-GtkWidget* page(AdwDialog* dlg, const char* title, const char* icon) {
+// The pages sit in a view stack in a window of their own: an AdwPreferencesDialog is
+// drawn inside the main window at a fixed size and cannot be resized (issue #50).
+GtkWidget* page(GtkWidget* stack, const char* title, const char* icon) {
   GtkWidget* p = adw_preferences_page_new();
   adw_preferences_page_set_title(ADW_PREFERENCES_PAGE(p), title);
   adw_preferences_page_set_icon_name(ADW_PREFERENCES_PAGE(p), icon);
-  adw_preferences_dialog_add(ADW_PREFERENCES_DIALOG(dlg), ADW_PREFERENCES_PAGE(p));
+  adw_view_stack_add_titled_with_icon(ADW_VIEW_STACK(stack), p, title, title, icon);
   return p;
 }
 GtkWidget* group(GtkWidget* pg, const char* title) {
@@ -102,7 +104,7 @@ double value(GtkWidget* w) { return adw_spin_row_get_value(ADW_SPIN_ROW(w)); }
 bool active(GtkWidget* w) { return adw_switch_row_get_active(ADW_SWITCH_ROW(w)); }
 int selected(GtkWidget* w) { return static_cast<int>(adw_combo_row_get_selected(ADW_COMBO_ROW(w))); }
 
-void onClosed(AdwDialog*, gpointer p) {
+gboolean onCloseRequest(GtkWindow*, gpointer p) {
   std::unique_ptr<Prefs> pr(static_cast<Prefs*>(p));
   Settings& s = *pr->s;
   int in = selected(pr->inDev), out = selected(pr->outDev);
@@ -218,6 +220,7 @@ void onClosed(AdwDialog*, gpointer p) {
   for (size_t i = 0; i < pr->bandRows.size() && i < s.bands.size(); ++i)
     s.bands[i].hz = value(pr->bandRows[i]) * 1000.0;
   if (pr->onApply) pr->onApply();
+  return FALSE;   // close the window
 }
 
 }  // namespace
@@ -226,11 +229,30 @@ void showPrefsDialog(GtkWidget* parent, Settings& s, std::function<void()> onApp
   auto* pr = new Prefs{};
   pr->s = &s;
   pr->onApply = std::move(onApply);
-  AdwDialog* dlg = ADW_DIALOG(adw_preferences_dialog_new());
+  GtkWidget* win = adw_window_new();
   std::string title = s.profile == Profiles::kDefault ? "Preferences" : "Preferences — " + s.profile;
-  adw_dialog_set_title(dlg, title.c_str());
-  adw_dialog_set_content_width(dlg, 640);
-  adw_dialog_set_content_height(dlg, 720);
+  gtk_window_set_title(GTK_WINDOW(win), title.c_str());
+  if (parent) gtk_window_set_transient_for(GTK_WINDOW(win), GTK_WINDOW(parent));
+  gtk_window_set_modal(GTK_WINDOW(win), TRUE);
+  gtk_window_set_default_size(GTK_WINDOW(win), 760, 720);
+  GtkWidget* dlg = adw_view_stack_new();   // the pages
+  GtkWidget* switcher = adw_view_switcher_new();
+  adw_view_switcher_set_stack(ADW_VIEW_SWITCHER(switcher), ADW_VIEW_STACK(dlg));
+  adw_view_switcher_set_policy(ADW_VIEW_SWITCHER(switcher), ADW_VIEW_SWITCHER_POLICY_NARROW);
+  GtkWidget* header = adw_header_bar_new();
+  adw_header_bar_set_title_widget(ADW_HEADER_BAR(header), switcher);
+  GtkWidget* view = adw_toolbar_view_new();
+  adw_toolbar_view_add_top_bar(ADW_TOOLBAR_VIEW(view), header);
+  adw_toolbar_view_set_content(ADW_TOOLBAR_VIEW(view), dlg);
+  adw_window_set_content(ADW_WINDOW(win), view);
+  // Escape closes it, as it closed the dialog.
+  GtkEventController* keys = gtk_event_controller_key_new();
+  g_signal_connect(keys, "key-pressed", G_CALLBACK(+[](GtkEventControllerKey*, guint key, guint, GdkModifierType, gpointer w) -> gboolean {
+    if (key != GDK_KEY_Escape) return FALSE;
+    gtk_window_close(GTK_WINDOW(w));
+    return TRUE;
+  }), win);
+  gtk_widget_add_controller(win, keys);
 
   // --- Audio
   {
@@ -508,8 +530,8 @@ void showPrefsDialog(GtkWidget* parent, Settings& s, std::function<void()> onApp
                              "Stations the receiver and the Skimmer identify appear on pskreporter.info. Needs your callsign and grid");
   }
 
-  g_signal_connect(dlg, "closed", G_CALLBACK(onClosed), pr);
-  adw_dialog_present(dlg, parent);
+  g_signal_connect(win, "close-request", G_CALLBACK(onCloseRequest), pr);
+  gtk_window_present(GTK_WINDOW(win));
 }
 
 }  // namespace gtty
