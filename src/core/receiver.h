@@ -42,7 +42,9 @@ class Receiver {
   void setSkimmer(bool on, double loHz, double hiHz, double stepHz);
   bool skimmerOn() const { return skimmerOn_; }
   void resetAfc() { std::lock_guard<std::mutex> lk(mu_); bank_.resetAfcAll(); }
-  void setMuted(bool m) { muted_.store(m); }   // ignore audio (while transmitting)
+  // While transmitting: the audio is ignored and nothing is received. What was decoded
+  // before keying is printed at once, ahead of what is sent (issue #47).
+  void setMuted(bool m) { muted_.store(m); }
   // Manual notch filters (Hz, at the internal rate) applied before the decoders.
   void setNotches(const std::vector<double>& freqsHz, double bwHz = 60.0);
   std::vector<double> notches() const;
@@ -83,6 +85,9 @@ class Receiver {
   std::mutex mu_;  // serializes configuration changes against the DSP thread
   std::atomic<bool> run_{false};
   std::atomic<bool> muted_{false};
+  bool mutedNow_ = false;       // muted_ as the DSP side last acted on it
+  std::vector<float> silence_;
+  void muteChanged(bool muted);
   size_t samplesSinceStatus_ = 0;
 };
 

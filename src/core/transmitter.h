@@ -2,6 +2,7 @@
 // (AFSK audio, FSK via UART / DTR / RTS, or the rig's own CAT text keyer),
 // with PTT sequencing through Hamlib.
 #pragma once
+#include <functional>
 #include <atomic>
 #include <chrono>
 #include <mutex>
@@ -45,6 +46,9 @@ struct TxConfig {
 class Transmitter : private TxSource {
  public:
   Transmitter(AudioEngine* engine, RigControl* rig, EventQueue* events);
+  // Called with true just before keying and with false just after unkeying, on the thread
+  // that keys: for muting the receiver without waiting for the PttEvent to be handled.
+  std::function<void(bool on)> onPtt;
   ~Transmitter();
 
   bool configure(const TxConfig& cfg, const RttyParams& params, std::string& err);

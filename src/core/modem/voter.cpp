@@ -75,6 +75,15 @@ void Voter::advance(uint64_t now) {
   }
 }
 
+void Voter::finish() {
+  while (!groups_.empty()) {
+    decide(groups_.front());
+    groups_.pop_front();
+  }
+  flushPending();
+  inSignal_ = false;
+}
+
 void Voter::decide(const Group& g) {
   float weight[32] = {0};
   int count[32] = {0};

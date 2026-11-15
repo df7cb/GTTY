@@ -42,6 +42,7 @@ MainWindow::MainWindow(AdwApplication* app)
     : rx_(&engine_, &events_), tx_(&engine_, &rig_, &events_) {
   settings_.load();
   rig_.onState = [this](const RigState& s) { events_.push(RigStateEvent{s}); };
+  tx_.onPtt = [this](bool on) { rx_.setMuted(on); };   // mute at the keying itself (issue #47)
   buildUi(app);
   applyTheme();
   applyCss();
@@ -1060,8 +1061,7 @@ void MainWindow::handle(const Event& e) {
     pttText_.clear();   // poll() rewrites the label
     gtk_widget_remove_css_class(pttLabel_, ptt->on ? "ptt-rx" : "ptt-tx");
     gtk_widget_add_css_class(pttLabel_, ptt->on ? "ptt-tx" : "ptt-rx");
-    rx_.setMuted(ptt->on);
-    radioDecoder_.setMuted(ptt->on);
+    radioDecoder_.setMuted(ptt->on);   // the receiver is muted by tx_.onPtt, at the keying itself
   } else if (auto* echo = std::get_if<TxEchoEvent>(&e)) {
     txSentAny_ = true;
     appendEcho(echo->text);

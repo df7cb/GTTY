@@ -85,9 +85,11 @@ bool Transmitter::keysPtt() const {
 }
 
 void Transmitter::setPtt(bool on) {
+  if (on && onPtt) onPtt(true);
   if (keysPtt()) {
     if (!rig_->setPtt(on) && events_) events_->push(MessageEvent{"PTT failed: " + rig_->state().error, true});
   }
+  if (!on && onPtt) onPtt(false);
   if (events_) events_->push(PttEvent{on});
 }
 
