@@ -71,5 +71,32 @@ int main() {
   bellUs.decode(baudot::FIGS);
   CHECK(!bellUs.decode(0x05));
   CHECK_EQ(*bellUs.decode(0x0b), '\'');
+
+  // The other shift's reading of a word (issue #26: "126" received as "QWY").
+  {
+    using baudot::otherShiftReading;
+    const auto ita = BaudotVariant::ITA2;
+    bool figs = false;
+    CHECK_EQ(otherShiftReading("QWY", ita, &figs), std::string("126"));
+    CHECK(figs);
+    CHECK_EQ(otherShiftReading("WPO", ita), std::string("209"));
+    CHECK_EQ(otherShiftReading("qwertyuiop", ita), std::string("1234567890"));
+    CHECK_EQ(otherShiftReading("TOO", ita), std::string("599"));
+    // Letters outside the top row: an ordinary word, no hint.
+    CHECK_EQ(otherShiftReading("TEST", ita), std::string());
+    CHECK_EQ(otherShiftReading("DF7CB", ita), std::string());
+    CHECK_EQ(otherShiftReading("599", ita), std::string());
+    CHECK_EQ(otherShiftReading("Q", ita), std::string());
+    // Letters printed as figures: punctuation back to letters, digits kept.
+    CHECK_EQ(otherShiftReading("DF7:?", ita, &figs), std::string("DF7CB"));
+    CHECK(!figs);
+    CHECK_EQ(otherShiftReading(":1", ita), std::string("C1"));
+    CHECK_EQ(otherShiftReading("-.", ita), std::string("AM"));
+    // The two alphabets differ: ITA2 has no '$', US-TTY prints D's figure as '$'.
+    CHECK_EQ(otherShiftReading("$!7:?", ita), std::string());
+    CHECK_EQ(otherShiftReading("$!7:?", BaudotVariant::USTTY), std::string("DF7CB"));
+    // Timestamps and other bracketed words are not hints.
+    CHECK_EQ(otherShiftReading("[07:22:39]", ita), std::string());
+  }
   TEST_MAIN_END();
 }

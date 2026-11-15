@@ -25,6 +25,49 @@ const char* lettersTable() { return kLetters; }
 const char* figuresTable(BaudotVariant v) {
   return v == BaudotVariant::ITA2 ? kFiguresITA2 : kFiguresUSTTY;
 }
+
+std::string otherShiftReading(const std::string& word, BaudotVariant v, bool* toFigures) {
+  if (word.size() < 2 || (word.front() == '[' && word.back() == ']')) return {};
+  const char* letters = lettersTable();
+  const char* figures = figuresTable(v);
+  auto codeOf = [](const char* table, char c) {
+    for (int code = 0; code < 32; ++code)
+      if (table[code] == c) return code;
+    return -1;
+  };
+  auto printable = [](char c) { return c > ' ' && c < 0x7f; };
+
+  bool allTopRow = true, anyPunct = false;
+  for (char raw : word) {
+    char c = static_cast<char>(std::toupper(static_cast<unsigned char>(raw)));
+    int code = std::isalpha(static_cast<unsigned char>(c)) ? codeOf(letters, c) : -1;
+    if (code < 0 || !std::isdigit(static_cast<unsigned char>(figures[code]))) allTopRow = false;
+    if (std::ispunct(static_cast<unsigned char>(c))) anyPunct = true;
+  }
+  std::string out;
+  if (allTopRow) {
+    for (char raw : word)
+      out.push_back(figures[codeOf(letters, static_cast<char>(std::toupper(static_cast<unsigned char>(raw))))]);
+    if (toFigures) *toFigures = true;
+    return out;
+  }
+  if (!anyPunct) return {};
+  bool changed = false;
+  for (char raw : word) {
+    char c = static_cast<char>(std::toupper(static_cast<unsigned char>(raw)));
+    if (std::ispunct(static_cast<unsigned char>(c))) {
+      int code = codeOf(figures, c);
+      if (code < 0 || !printable(letters[code])) return {};   // not a character this alphabet prints
+      out.push_back(letters[code]);
+      changed = true;
+    } else {
+      out.push_back(c);
+    }
+  }
+  if (!changed) return {};
+  if (toFigures) *toFigures = false;
+  return out;
+}
 }  // namespace baudot
 
 std::vector<uint8_t> BaudotEncoder::encode(char c) {
