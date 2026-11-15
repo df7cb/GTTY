@@ -23,13 +23,11 @@ This file has no front matter on purpose: `tools/build_wiki.py` and
 - [ ] **#14 Space before end-of-transmission noise.** Implemented in #19,
       tested on simulated signals only. Needs on-air feedback about missing or
       extra spaces (a fade of two or more characters can add one).
-- [ ] **#32 Radio's built-in decoder on single-port Icoms.** df7cb reports
-      that the IC-7300's "USB Serial Function" menu makes the USB port either
-      CI-V or RTTY decode, not both. Remaining work: say so in
-      `docs/rig-control.md` (decode over USB needs CI-V on the rear remote jack
-      or no CAT), and decide whether gtty should run the Radio pane without a
-      rig connection. Still unverified from #15: line breaks in a QTC series on
-      the IC-7610.
+- [x] **#32 Radio's built-in decoder on single-port Icoms.** The original
+      IC-7300's *USB Serial Function* makes its one USB port either CI-V or RTTY
+      decode; the IC-7300MKII has two ports like the IC-7610 (df7cb, from the
+      MKII manual). Both are in `docs/decoders.md`. Still unverified from #15:
+      line breaks in a QTC series on the IC-7610.
 - [ ] **#6 Umbrella issue.** Every item has been split out. Close it once #7
       and #14 are settled. #12 and #13 (highlighting) are closed but were never
       confirmed on the air.
