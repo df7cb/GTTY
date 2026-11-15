@@ -421,7 +421,7 @@ void showPrefsDialog(GtkWidget* parent, Settings& s, std::function<void()> onApp
                       {"Follow rig sideband (matches the rig's scope)", "Low audio on the left", "Low audio on the right"},
                       s.waterfallDirection);
     pr->fontSize = spin(g2, "Text font size (px)", 8, 32, 1, s.fontSize);
-    pr->rxTimestamps = toggle(g2, "Timestamps at the start of each received line", s.rxTimestamps);
+    pr->rxTimestamps = toggle(g2, "Timestamps at the start of each received and sent line", s.rxTimestamps);
     pr->rxLogToFile = toggle(g2, "Save received and sent text to a daily session file", s.rxLogToFile);
     pr->rxLogDir = entry(g2, "Session file directory", s.rxLogDir);
     pr->modemOnly = toggle(g2, "Modem-only view", s.modemOnly,

@@ -22,6 +22,9 @@ class Voter {
   void setVoting(int slot, bool votes);    // engines that are disabled or excluded do not vote
   void add(int slot, const CodeEvent& e);  // from the engines, in sample-time order per slot
   void advance(uint64_t now);              // closes groups whose hold time has passed
+  // Decides every open group now, late engines or not, and prints what was held back: the
+  // input has ended (we are about to transmit).
+  void finish();
   void reset();
 
   std::function<void(char)> onChar;

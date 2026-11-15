@@ -42,6 +42,7 @@ MainWindow::MainWindow(AdwApplication* app)
     : rx_(&engine_, &events_), tx_(&engine_, &rig_, &events_) {
   settings_.load();
   rig_.onState = [this](const RigState& s) { events_.push(RigStateEvent{s}); };
+  tx_.onPtt = [this](bool on) { rx_.setMuted(on); };   // mute at the keying itself (issue #47)
   buildUi(app);
   applyTheme();
   applyCss();
@@ -305,6 +306,7 @@ GtkWidget* MainWindow::buildRxPanes() {
   myCallTags_.resize(n); cqTags_.resize(n); reportTags_.resize(n); exchangeTags_.resize(n);
   rxHighlight_.assign(n, RxHighlighter{});
   rxLineStart_.assign(n, true);
+  echoStarted_.assign(n, false);
   rxBreaks_.assign(n, LineBreaks{});
   rxPanes_.assign(n, nullptr);
   modeDrops_.assign(engines, nullptr);
@@ -1060,8 +1062,7 @@ void MainWindow::handle(const Event& e) {
     pttText_.clear();   // poll() rewrites the label
     gtk_widget_remove_css_class(pttLabel_, ptt->on ? "ptt-rx" : "ptt-tx");
     gtk_widget_add_css_class(pttLabel_, ptt->on ? "ptt-tx" : "ptt-rx");
-    rx_.setMuted(ptt->on);
-    radioDecoder_.setMuted(ptt->on);
+    radioDecoder_.setMuted(ptt->on);   // the receiver is muted by tx_.onPtt, at the keying itself
   } else if (auto* echo = std::get_if<TxEchoEvent>(&e)) {
     txSentAny_ = true;
     appendEcho(echo->text);
@@ -1168,6 +1169,15 @@ void MainWindow::appendRx(int slot, const std::string& text) {
       sessionWrite(std::string(1, c), false);
       pskReportRx(c);
     }
+    // Received text after sent text starts a line of its own, also when it arrives before
+    // onTxEnded() has noticed the transmission is over (the receiver unmutes at unkeying).
+    if (echoStarted_[slot]) {
+      echoStarted_[slot] = false;
+      if (!rxLineStart_[slot] && c != '\n') {
+        appendKeepingSelection(buf, "\n", 1);
+        rxLineStart_[slot] = true;
+      }
+    }
     // A selection that reaches the end of the text must not grow with what arrives.
     if (rxLineStart_[slot] && c != '\n' && settings_.rxTimestamps) {
       std::string stamp = "[" + Logbook::nowUtc().substr(11, 8) + "] ";
@@ -1220,11 +1230,27 @@ void MainWindow::appendEcho(const std::string& text) {
   sessionWrite(t, true);
   if (t.empty()) return;
   // Every pane shows what was sent, so the exchange reads in order whichever one is watched.
+  // Sent lines are stamped like received ones (issue #48), as the session file does.
+  const std::string stamp = settings_.rxTimestamps ? "[" + Logbook::nowUtc().substr(11, 8) + "] " : "";
   for (size_t i = 0; i < rxBufs_.size(); ++i) {
-    rxLineStart_[i] = (t.back() == '\n');
     rxWord_[i].clear();   // a received word does not continue through what was sent
     rxHighlight_[i].newLine();
-    appendKeepingSelection(rxBufs_[i], t.c_str(), -1, echoTags_[i]);
+    // With timestamps, a transmission starts a stamped line of its own even when what is
+    // sent has no line break first (the rig's CAT keyer sends none).
+    if (!stamp.empty() && !echoStarted_[i] && !rxLineStart_[i]) {
+      appendKeepingSelection(rxBufs_[i], "\n", 1);
+      rxLineStart_[i] = true;
+    }
+    echoStarted_[i] = true;
+    size_t from = 0;
+    while (from < t.size()) {
+      size_t nl = t.find('\n', from);
+      size_t to = nl == std::string::npos ? t.size() : nl + 1;
+      if (rxLineStart_[i] && t[from] != '\n' && !stamp.empty()) appendKeepingSelection(rxBufs_[i], stamp.c_str(), -1, timeTags_[i]);
+      appendKeepingSelection(rxBufs_[i], t.c_str() + from, static_cast<int>(to - from), echoTags_[i]);
+      rxLineStart_[i] = t[to - 1] == '\n';
+      from = to;
+    }
     gtk_text_view_scroll_mark_onscreen(GTK_TEXT_VIEW(rxViews_[i]), rxEndMarks_[i]);
   }
 }
@@ -2465,6 +2491,7 @@ void MainWindow::onTxEnded() {
   // End the transmitted line in every pane that showed it; the session file gets one line end.
   bool ended = false;
   for (size_t i = 0; i < rxBufs_.size(); ++i) {
+    echoStarted_[i] = false;
     if (rxLineStart_[i]) continue;
     appendKeepingSelection(rxBufs_[i], "\n", 1);
     rxLineStart_[i] = true;

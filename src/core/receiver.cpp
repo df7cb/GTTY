@@ -91,15 +91,18 @@ void Receiver::loop() {
       std::this_thread::sleep_for(std::chrono::milliseconds(4));
       continue;
     }
-    if (muted_) {
-      for (size_t i = 0; i < n; ++i) buf[i] = 0;
-    }
     processSamples(buf.data(), n, engine_->inputRate());
   }
 }
 
 void Receiver::processSamples(const float* in, size_t n, double inRate) {
   std::lock_guard<std::mutex> lk(mu_);
+  const bool muted = muted_.load();
+  if (muted != mutedNow_) muteChanged(muted);
+  if (muted) {
+    silence_.assign(n, 0.f);   // the engines keep time on silence
+    in = silence_.data();
+  }
   if (!resampler_ || resamplerInRate_ != inRate) {
     resampler_ = std::make_unique<Resampler>(inRate, kInternalRate);
     resamplerInRate_ = inRate;
@@ -107,6 +110,21 @@ void Receiver::processSamples(const float* in, size_t n, double inRate) {
   resampled_.clear();
   resampler_->process(in, n, resampled_);
   processInternal(resampled_.data(), resampled_.size());
+}
+
+// Keying: everything decoded from the audio before it is printed now, ahead of the
+// transmitted text, instead of as the vote's hold time and the held characters run out.
+// Back on receive: what the vote and the trailing filters built on the silence is dropped.
+void Receiver::muteChanged(bool muted) {
+  if (muted) {
+    voter_.finish();
+    for (size_t i = 0; i < trailing_.size(); ++i) trailing_[i].finish(pendingText_[i]);
+    flushEvents();
+  } else {
+    voter_.reset();
+    for (auto& t : trailing_) t.reset();
+  }
+  mutedNow_ = muted;
 }
 
 void Receiver::setNotches(const std::vector<double>& freqsHz, double bwHz) {
@@ -148,6 +166,10 @@ void Receiver::processInternal(const float* inConst, size_t n) {
 
 void Receiver::flushEvents() {
   if (!events_) return;
+  if (mutedNow_) {   // decoded from the silence while transmitting: not reception
+    for (auto& t : pendingText_) t.clear();
+    if (skimmerOn_) skimmer_.collect([](double, float, const std::string&) {});
+  }
   for (size_t i = 0; i < pendingText_.size(); ++i) {
     if (!pendingText_[i].empty()) {
       events_->push(RxTextEvent{static_cast<int>(i), pendingText_[i]});

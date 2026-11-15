@@ -55,7 +55,7 @@ Lookups need a build with libcurl; the Debian packages and the AppImage have it.
 
 Under *Preferences → Station*:
 
-- **Timestamps at the start of each received line** prefixes each line in the receive panes with the UTC time.
+- **Timestamps at the start of each received and sent line** prefixes each line in the receive panes with the UTC time, the lines you send included.
 - **Save received and sent text to a daily session file** appends everything from the Best guess pane and everything you send to `gtty-<date>.txt` in the **Session file directory** (`~/.local/share/gtty/sessions` by default). Lines are stamped with the UTC time and marked RX or TX; the session start and end are recorded.
 
 The session file is the raw material for tuning the decoders on your own recordings, together with `gtty-cli record`.

@@ -58,6 +58,17 @@ class TrailingNoise {
     run_ = 0;
   }
 
+  // The input has ended: print a held character now, as idle() would once it timed out.
+  void finish(std::string& out) {
+    if (held_) {
+      separate(out);
+      emit(held_, out);
+      held_ = 0;
+    }
+    inSignal_ = false;
+    run_ = 0;
+  }
+
   void reset() { *this = TrailingNoise{}; }
 
   // From the engines' confidence on recordings and simulated signals: 0.58 and up on a
