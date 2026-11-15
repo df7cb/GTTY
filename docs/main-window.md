@@ -118,7 +118,7 @@ The controls sit in one row when the window is wide enough and wrap onto further
 | **Abort** | Drop PTT immediately and discard unsent text (**Esc**) |
 | **Clear text** | Clear the receive and transmit panes (**Ctrl+K**) |
 | **Baud** | 45.45, 50, 75 or 100 baud |
-| **⋮** | Opens **Shift** (170, 200, 425, 450 or 850 Hz) and **Tones** (mark/space presets; *Custom* when the tones were set freely in Preferences) |
+| **Shift/Tones ⋮** | Opens **Shift** (170, 200, 425, 450 or 850 Hz) and **Tones** (mark/space presets; *Custom* when the tones were set freely in Preferences). The menu closes when a value is chosen |
 | **AFC** | Automatic frequency control follows the signal within the AFC range |
 | **ATC** | Automatic threshold control normalizes the mark and space levels |
 | **Rev** | Reverse mark and space, for a station that sends reversed. With rig control the tones already follow the rig's sideband (see [Tuning](tuning.md)) |

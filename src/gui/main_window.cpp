@@ -614,11 +614,15 @@ GtkWidget* MainWindow::buildControlRow() {
     g_signal_connect(tonesDrop_, "notify::selected", G_CALLBACK(onTonesNotify), this);
     moreRow(1, "Tones", tonesDrop_);
   }
-  GtkWidget* morePop = gtk_popover_new();
-  gtk_popover_set_child(GTK_POPOVER(morePop), more);
+  shiftTonesPop_ = gtk_popover_new();
+  gtk_popover_set_child(GTK_POPOVER(shiftTonesPop_), more);
+  // Connected after the handlers that apply the choice: a choice made here closes the menu.
+  g_signal_connect(shiftDrop_, "notify::selected", G_CALLBACK(onShiftTonesChosen), this);
+  g_signal_connect(tonesDrop_, "notify::selected", G_CALLBACK(onShiftTonesChosen), this);
+  gtk_box_append(GTK_BOX(row), gtk_label_new("Shift/Tones"));
   GtkWidget* moreBtn = gtk_menu_button_new();
   gtk_menu_button_set_icon_name(GTK_MENU_BUTTON(moreBtn), "view-more-symbolic");
-  gtk_menu_button_set_popover(GTK_MENU_BUTTON(moreBtn), morePop);
+  gtk_menu_button_set_popover(GTK_MENU_BUTTON(moreBtn), shiftTonesPop_);
   gtk_widget_set_tooltip_text(moreBtn, "Shift and tones");
   gtk_box_append(GTK_BOX(row), moreBtn);
 
@@ -925,6 +929,17 @@ void MainWindow::onTonesNotify(GObject*, GParamSpec*, gpointer p) {
   self->settings_.rtty.setTones(tonePresets()[i].mark, tonePresets()[i].space);
   self->applyRttyParams(true);
   self->syncControlsFromSettings();  // update Shift and Rev to match
+}
+
+void MainWindow::onShiftTonesChosen(GObject*, GParamSpec*, gpointer p) {
+  auto* self = static_cast<MainWindow*>(p);
+  // Not when gtty sets the drop-downs itself (a profile, the tones following the shift).
+  if (self->suppressControlEvents_ || !self->shiftTonesPop_) return;
+  // Once the drop-down has put its own list away, which it does after this signal.
+  g_idle_add_full(G_PRIORITY_DEFAULT_IDLE, [](gpointer pop) -> gboolean {
+    gtk_popover_popdown(GTK_POPOVER(pop));
+    return G_SOURCE_REMOVE;
+  }, g_object_ref(self->shiftTonesPop_), g_object_unref);
 }
 
 gboolean MainWindow::onTick(gpointer p) {
