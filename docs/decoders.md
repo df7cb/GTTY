@@ -69,6 +69,19 @@ Stations appear in the **Skimmer** page of the sidebar, sorted by frequency, wit
 
 **Click a row** to move the decoders to that signal and put the callsign in the Call field. Entries disappear 90 seconds after the station was last heard.
 
+### Callsigns on the waterfall
+
+As in WSJT-X Improved and FT8CN, each station the Skimmer identifies is labelled on the waterfall at its mark tone, and the label scrolls down with the signal's trace. A station gets a label when its callsign follows `DE` or `CQ` or has been received twice (the rules of the [spot feed](integrations.md#what-is-sent), so noise does not make labels), and a new one every 20 seconds while it is still heard, when it moves, or when what it is doing changes. Colors:
+
+| Label | Meaning |
+|---|---|
+| Green | Calling CQ or TEST |
+| Red | Your callsign is in what it sent |
+| Grey | A dupe on this band in the logbook |
+| Dark | Anything else |
+
+**Click a label** to tune to that station and take its callsign, as with a Skimmer row. Turn the labels off under *Preferences → Decoders → Skimmer → Callsigns on the waterfall*.
+
 A contest logger can show the same stations in its own band map: see [Skimmer spot feed](integrations.md#skimmer-spot-feed).
 
 {: .tip }

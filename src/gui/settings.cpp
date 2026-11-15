@@ -295,6 +295,7 @@ bool Settings::loadFrom(const std::string& path) {
   showVotePane = boolean(kf, "decoders", "show_vote", showVotePane);
   skimmerEnabled = boolean(kf, "decoders", "skimmer", skimmerEnabled);
   skimmerStepHz = dbl(kf, "decoders", "skimmer_step", skimmerStepHz);
+  skimmerWaterfallCalls = boolean(kf, "decoders", "skimmer_waterfall_calls", skimmerWaterfallCalls);
   radioDecoderEnabled = boolean(kf, "decoders", "radio", radioDecoderEnabled);
   radioDecoderDevice = str(kf, "decoders", "radio_device", radioDecoderDevice);
   radioDecoderBaud = integer(kf, "decoders", "radio_baud", radioDecoderBaud);
@@ -425,6 +426,7 @@ bool Settings::saveTo(const std::string& path) const {
   g_key_file_set_boolean(kf, "decoders", "show_vote", showVotePane);
   g_key_file_set_boolean(kf, "decoders", "skimmer", skimmerEnabled);
   g_key_file_set_double(kf, "decoders", "skimmer_step", skimmerStepHz);
+  g_key_file_set_boolean(kf, "decoders", "skimmer_waterfall_calls", skimmerWaterfallCalls);
   g_key_file_set_boolean(kf, "decoders", "radio", radioDecoderEnabled);
   g_key_file_set_string(kf, "decoders", "radio_device", radioDecoderDevice.c_str());
   g_key_file_set_integer(kf, "decoders", "radio_baud", radioDecoderBaud);

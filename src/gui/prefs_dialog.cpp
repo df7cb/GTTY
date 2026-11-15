@@ -30,7 +30,7 @@ struct Prefs {
   GtkWidget *cbProvider, *cbUser, *cbPass, *cbAutoFill;
   struct DecRows { GtkWidget *enabled = nullptr, *show = nullptr, *votes = nullptr, *mode = nullptr, *filterBits = nullptr, *window = nullptr, *atcTau = nullptr; };
   std::vector<DecRows> dec;
-  GtkWidget *showVote, *skimmer, *skimmerStep, *radioDec, *radioDecDevice, *radioDecBaud;
+  GtkWidget *showVote, *skimmer, *skimmerStep, *skimmerCalls, *radioDec, *radioDecDevice, *radioDecBaud;
   GtkWidget *baud, *mark, *space, *preset, *stopBits, *variant, *uos, *afcRange, *netTx, *followSideband;
   bool applyingPreset = false;
   GtkWidget *txMethod, *fskDevice, *fskInvert, *diddle, *afskLevel, *pttViaRig, *txMode, *preamble, *pttLead;
@@ -152,6 +152,7 @@ void onClosed(AdwDialog*, gpointer p) {
   s.showVotePane = active(pr->showVote);
   s.skimmerEnabled = active(pr->skimmer);
   s.skimmerStepHz = value(pr->skimmerStep);
+  s.skimmerWaterfallCalls = active(pr->skimmerCalls);
   s.radioDecoderEnabled = active(pr->radioDec);
   s.radioDecoderDevice = text(pr->radioDecDevice);
   s.radioDecoderBaud = kRadioDecoderBauds[std::clamp(selected(pr->radioDecBaud), 0, kRadioDecoderBaudCount - 1)];
@@ -346,6 +347,8 @@ void showPrefsDialog(GtkWidget* parent, Settings& s, std::function<void()> onApp
     pr->skimmer = toggle(gs, "Decode the whole passband", s.skimmerEnabled,
                          "A decoder every step across the waterfall range; stations appear in the Skimmer list of the sidebar. Uses CPU");
     pr->skimmerStep = spin(gs, "Channel step (Hz)", 20, 200, 10, s.skimmerStepHz);
+    pr->skimmerCalls = toggle(gs, "Callsigns on the waterfall", s.skimmerWaterfallCalls,
+                              "Label each station at its signal, as WSJT-X does: green calling CQ, red calling you, grey worked. Click a label to tune to it");
     GtkWidget* gr = group(pg, "Radio's built-in decoder");
     pr->radioDec = toggle(gr, "Show what the radio decodes", s.radioDecoderEnabled,
                           "For radios that print their own RTTY decoder on a serial port, such as the second USB port of an Icom IC-7610 or IC-9700 set to RTTY Decode. It gets a pane of its own and does not take part in the best-guess vote");

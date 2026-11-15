@@ -4,7 +4,9 @@
 
 #include "core/dsp/noise_floor.h"
 
+#include <cstdint>
 #include <functional>
+#include <string>
 #include <vector>
 
 namespace gtty {
@@ -32,6 +34,14 @@ class Waterfall {
   std::function<void(double hz)> onMiddleClick;   // toggle a notch
   void setNotches(const std::vector<double>& hz) { notches_ = hz; gtk_widget_queue_draw(area_); }
 
+  // Callsign labels, as WSJT-X Improved and FT8CN draw them: placed at the top of the
+  // waterfall at a station's mark tone when it is identified, they scroll down with
+  // its trace. Clicking one calls onLabelClick instead of tuning to the click.
+  enum class LabelKind { Normal, Cq, ToMe, Dupe };
+  void addCallLabel(double markHz, const std::string& call, LabelKind kind);
+  void clearCallLabels() { labels_.clear(); gtk_widget_queue_draw(area_); }
+  std::function<void(double markHz, const std::string& call)> onLabelClick;
+
  private:
   static void draw(GtkDrawingArea*, cairo_t* cr, int w, int h, gpointer self);
   static void pressed(GtkGestureClick* g, int n, double x, double y, gpointer self);
@@ -52,6 +62,16 @@ class Waterfall {
     return (reversed_ ? 1.0 - t : t) * w;
   }
   void blankHistory();
+  struct CallLabel {
+    double hz;
+    std::string text;
+    LabelKind kind;
+    int64_t row;    // rows_ when the label was at the top of the waterfall
+    double width;   // text width in px, for hit testing
+  };
+  // Box of a label in widget coordinates: x, y (top), width, height.
+  void labelBox(const CallLabel& l, int w, double& x, double& y, double& bw, double& bh) const;
+  const CallLabel* labelAt(double x, double y, int w) const;
   static void colormap(float v, unsigned char* bgra);
 
   GtkWidget* area_;
@@ -68,13 +88,16 @@ class Waterfall {
   gint64 lastSpectrumUs_ = 0;
   double hoverHz_ = -1;
   std::vector<double> notches_;
+  std::vector<CallLabel> labels_;
+  int64_t rows_ = 0;   // rows scrolled since start
   // drag state
-  double dragStartX_ = 0;
+  double dragStartX_ = 0, dragStartY_ = 0;
   double dragStartCenter_ = 0;
   bool dragInsideWindow_ = false;
   bool dragging_ = false;
   bool dragMoved_ = false;
   static constexpr int kSpectrumHeight = 70;
+  static constexpr double kLabelFont = 11, kLabelHeight = 15, kLabelPad = 3;
 };
 
 }  // namespace gtty

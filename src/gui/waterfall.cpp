@@ -66,6 +66,7 @@ void Waterfall::setReversed(bool reversed) {
 
 // The history no longer lines up with the new scale: blank it, keep the surface.
 void Waterfall::blankHistory() {
+  labels_.clear();
   if (surf_) {
     cairo_t* cr = cairo_create(surf_);
     cairo_set_source_rgb(cr, 0, 0, 0.08);
@@ -145,6 +146,9 @@ void Waterfall::addSpectrum(const std::vector<float>& db, double binHz) {
   unsigned char* data = cairo_image_surface_get_data(surf_);
   int stride = cairo_image_surface_get_stride(surf_);
   std::memmove(data + stride, data, static_cast<size_t>(stride) * (sh_ - 1));
+  ++rows_;
+  labels_.erase(std::remove_if(labels_.begin(), labels_.end(), [&](const CallLabel& l) { return rows_ - l.row > sh_; }),
+                labels_.end());
   // Draw the new top row: for each pixel take the max over the bins it spans.
   for (int x = 0; x < sw_; ++x) {
     double f0 = std::min(xToHz(x, sw_), xToHz(x + 1, sw_)), f1 = std::max(xToHz(x, sw_), xToHz(x + 1, sw_));
@@ -236,6 +240,39 @@ void Waterfall::draw(GtkDrawingArea*, cairo_t* cr, int w, int h, gpointer p) {
   cursor(self->mark_, 1, 0.3, 0.3, false);
   cursor(self->space_, 0.3, 0.6, 1, false);
   cairo_set_dash(cr, nullptr, 0, 0);
+  // Callsign labels, clipped to the waterfall.
+  if (!self->labels_.empty()) {
+    cairo_save(cr);
+    cairo_rectangle(cr, 0, sh, w, h - sh);
+    cairo_clip(cr);
+    cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
+    cairo_set_font_size(cr, kLabelFont);
+    for (auto& l : self->labels_) {
+      cairo_text_extents_t ext;
+      cairo_text_extents(cr, l.text.c_str(), &ext);
+      l.width = ext.x_advance;
+      double x, y, bw, bh;
+      self->labelBox(l, w, x, y, bw, bh);
+      double bg[4], fg[3];
+      switch (l.kind) {   // the colours WSJT-X uses: CQ green, calling me red, worked grey
+        case LabelKind::Cq: bg[0] = 0.25; bg[1] = 0.8; bg[2] = 0.3; bg[3] = 0.85; fg[0] = fg[1] = fg[2] = 0; break;
+        case LabelKind::ToMe: bg[0] = 0.95; bg[1] = 0.3; bg[2] = 0.3; bg[3] = 0.9; fg[0] = fg[1] = fg[2] = 1; break;
+        case LabelKind::Dupe: bg[0] = bg[1] = bg[2] = 0.45; bg[3] = 0.75; fg[0] = fg[1] = fg[2] = 0.85; break;
+        default: bg[0] = 0.05; bg[1] = 0.05; bg[2] = 0.15; bg[3] = 0.75; fg[0] = fg[1] = fg[2] = 1; break;
+      }
+      cairo_set_source_rgba(cr, bg[0], bg[1], bg[2], bg[3]);
+      cairo_rectangle(cr, x, y, bw, bh);
+      cairo_fill(cr);
+      // A tick at the mark tone, so the label is tied to its trace.
+      double mx = self->hzToX(l.hz, w);
+      cairo_rectangle(cr, mx - 0.5, y, 1.5, bh + 4);
+      cairo_fill(cr);
+      cairo_set_source_rgb(cr, fg[0], fg[1], fg[2]);
+      cairo_move_to(cr, x + kLabelPad, y + bh - 4);
+      cairo_show_text(cr, l.text.c_str());
+    }
+    cairo_restore(cr);
+  }
   // Hover readout
   if (self->hoverHz_ >= 0) {
     char buf[32];
@@ -245,6 +282,50 @@ void Waterfall::draw(GtkDrawingArea*, cairo_t* cr, int w, int h, gpointer p) {
     cairo_move_to(cr, w - 70, sh - 6);
     cairo_show_text(cr, buf);
   }
+}
+
+void Waterfall::labelBox(const CallLabel& l, int w, double& x, double& y, double& bw, double& bh) const {
+  bw = l.width + 2 * kLabelPad;
+  bh = kLabelHeight;
+  double mx = hzToX(l.hz, w);
+  // Beside the mark tone, toward the space tone (higher audio unless reversed); flipped at the edge.
+  x = reversed_ ? mx - bw : mx;
+  if (x + bw > w) x = mx - bw;
+  if (x < 0) x = mx;
+  y = kSpectrumHeight + static_cast<double>(rows_ - l.row);
+}
+
+const Waterfall::CallLabel* Waterfall::labelAt(double px, double py, int w) const {
+  for (auto it = labels_.rbegin(); it != labels_.rend(); ++it) {   // newest on top
+    double x, y, bw, bh;
+    labelBox(*it, w, x, y, bw, bh);
+    if (px >= x && px <= x + bw && py >= y && py <= y + bh) return &*it;
+  }
+  return nullptr;
+}
+
+void Waterfall::addCallLabel(double markHz, const std::string& call, LabelKind kind) {
+  int w = gtk_widget_get_width(area_);
+  if (w <= 0 || markHz < lo_ || markHz > hi_) return;
+  CallLabel l{markHz, call, kind, rows_, 7.5 * static_cast<double>(call.size())};   // width until drawn
+  // Stack below labels still near the top that would overlap.
+  for (bool moved = true; moved;) {
+    moved = false;
+    double x, y, bw, bh;
+    labelBox(l, w, x, y, bw, bh);
+    for (const auto& o : labels_) {
+      double ox, oy, obw, obh;
+      labelBox(o, w, ox, oy, obw, obh);
+      if (x < ox + obw + 2 && ox < x + bw + 2 && y < oy + obh + 1 && oy < y + bh + 1) {
+        l.row = o.row - static_cast<int64_t>(kLabelHeight) - 1;
+        moved = true;
+        break;
+      }
+    }
+    if (rows_ - l.row > sh_ / 2) return;   // no room: skip rather than pile up
+  }
+  labels_.push_back(std::move(l));
+  gtk_widget_queue_draw(area_);
 }
 
 void Waterfall::pressed(GtkGestureClick*, int, double x, double, gpointer p) {
@@ -259,10 +340,11 @@ void Waterfall::middlePressed(GtkGestureClick*, int, double x, double, gpointer 
   if (self->onMiddleClick) self->onMiddleClick(self->xToHz(x, w));
 }
 
-void Waterfall::dragBegin(GtkGestureDrag*, double x, double, gpointer p) {
+void Waterfall::dragBegin(GtkGestureDrag*, double x, double y, gpointer p) {
   auto* self = static_cast<Waterfall*>(p);
   int w = gtk_widget_get_width(self->area_);
   self->dragStartX_ = x;
+  self->dragStartY_ = y;
   self->dragStartCenter_ = (self->nomMark_ + self->nomSpace_) / 2.0;
   double lo = std::min(self->nomMark_, self->nomSpace_), hi = std::max(self->nomMark_, self->nomSpace_);
   double margin = 12.0 * (self->hi_ - self->lo_) / w;  // 12 px grab margin
@@ -289,8 +371,14 @@ void Waterfall::dragEnd(GtkGestureDrag*, double dx, double, gpointer p) {
   auto* self = static_cast<Waterfall*>(p);
   if (!self->dragging_) return;
   self->dragging_ = false;
-  if (!self->dragMoved_) {  // plain click: jump to the pressed position
+  if (!self->dragMoved_) {  // plain click: a callsign label, or jump to the pressed position
     int w = gtk_widget_get_width(self->area_);
+    if (const CallLabel* l = self->labelAt(self->dragStartX_, self->dragStartY_, w); l && self->onLabelClick) {
+      double hz = l->hz;
+      std::string call = l->text;
+      self->onLabelClick(hz, call);
+      return;
+    }
     if (self->onClickTune) self->onClickTune(self->xToHz(self->dragStartX_, w));
   }
 }

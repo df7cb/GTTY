@@ -181,6 +181,7 @@ void MainWindow::buildUi(AdwApplication* app) {
     applyRttyParams(true);
   };
   wf_.onMiddleClick = [this](double hz) { toggleNotch(hz); };
+  wf_.onLabelClick = [this](double markHz, const std::string& call) { tuneToSkimmed(markHz, call); };
   wf_.onNudge = [this](double deltaHz) {
     settings_.rtty.markFreq = std::round(settings_.rtty.markFreq + deltaHz);
     applyRttyParams(true);
@@ -1966,6 +1967,7 @@ void MainWindow::applyDecoderSettings() {
   if (rxPanes_[radioSlot()]) gtk_widget_set_visible(rxPanes_[radioSlot()], settings_.radioDecoderEnabled);
   rx_.setSkimmer(settings_.skimmerEnabled, settings_.waterfallLoHz, settings_.waterfallHiHz, settings_.skimmerStepHz);
   if (skimmerAction_) g_simple_action_set_state(skimmerAction_, g_variant_new_boolean(settings_.skimmerEnabled));
+  if (!settings_.skimmerEnabled || !settings_.skimmerWaterfallCalls) { wf_.clearCallLabels(); wfLabels_.clear(); }
   if (!settings_.skimmerEnabled) { skim_.clear(); skimDirty_ = true; }
   gtk_label_set_text(GTK_LABEL(skimStatus_), settings_.skimmerEnabled ? "listening across the passband" : "skimmer off (menu or Preferences → Decoders)");
 }
@@ -2006,7 +2008,44 @@ void MainWindow::onSkimmerText(const SkimmerTextEvent& e) {
   if (hit->text.size() > 160) hit->text.erase(0, hit->text.size() - 160);
   for (const auto& [pos, len] : findCallsigns(hit->text)) hit->call = upper(hit->text.substr(pos, len));
   skimDirty_ = true;
+  labelSkimmed(hit->text, hit->markHz);
   spotSkimmed(hit->text, hit->markHz);
+}
+
+// Label the station a skimmer channel identifies on the waterfall: when it is first
+// identified, when what it is doing changes (starts calling CQ or you), when it moves,
+// and every 20 s while it is still heard, so its trace stays labelled as it scrolls.
+void MainWindow::labelSkimmed(const std::string& text, double markHz) {
+  if (!settings_.skimmerWaterfallCalls) return;
+  bool cq = false;
+  const std::string recent = text.size() > 90 ? text.substr(text.size() - 90) : text;
+  std::string call = spottableCall(recent, settings_.myCall, &cq);   // the spot feed's rules: no noise
+  if (call.empty()) return;
+  using K = Waterfall::LabelKind;
+  std::string my = upper(settings_.myCall);
+  K kind = K::Normal;
+  if (!my.empty() && upper(recent).find(my) != std::string::npos) kind = K::ToMe;
+  else if (cq) kind = K::Cq;
+  else if (log_.isOpen() && log_.isDupe(call, bandForFrequency(dialFreqHz()), "RTTY")) kind = K::Dupe;
+  int64_t now = g_get_monotonic_time();
+  auto it = wfLabels_.find(call);
+  if (it != wfLabels_.end() && it->second.kind == static_cast<int>(kind) && std::fabs(it->second.markHz - markHz) < 30 &&
+      now - it->second.at < 20 * G_USEC_PER_SEC)
+    return;
+  if (wfLabels_.size() > 2000) wfLabels_.clear();
+  wfLabels_[call] = {markHz, static_cast<int>(kind), now};
+  wf_.addCallLabel(markHz, call, kind);
+}
+
+// Tune the decoders to a skimmed station and take its callsign (Skimmer list or waterfall label).
+void MainWindow::tuneToSkimmed(double markHz, const std::string& call) {
+  settings_.rtty.markFreq = std::round(markHz);
+  applyRttyParams(true);
+  syncControlsFromSettings();
+  if (!call.empty() && !tx_.transmitting()) {
+    gtk_editable_set_text(GTK_EDITABLE(callEntry_), call.c_str());
+    setAutoCq(false);
+  }
 }
 
 // ------------------------------------------------- skimmer spot feed (telnet)
@@ -2101,13 +2140,7 @@ void MainWindow::onSkimActivated(GtkListBox*, GtkListBoxRow* row, gpointer p) {
   int idx = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(row), "skim-index"));
   if (idx < 0 || idx >= static_cast<int>(self->skim_.size())) return;
   const SkimEntry s = self->skim_[idx];
-  self->settings_.rtty.markFreq = std::round(s.markHz);
-  self->applyRttyParams(true);
-  self->syncControlsFromSettings();
-  if (!s.call.empty() && !self->tx_.transmitting()) {
-    gtk_editable_set_text(GTK_EDITABLE(self->callEntry_), s.call.c_str());
-    self->setAutoCq(false);
-  }
+  self->tuneToSkimmed(s.markHz, s.call);
 }
 
 void MainWindow::openCluster() {
