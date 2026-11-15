@@ -84,6 +84,15 @@ int main() {
     // AFC is rarely on a whole Hz; the distance from the dial is.
     CHECK_EQ(markRadioFrequency(7039200.0, "USB", false, onUsb.markFreq, 6.4), 7041501.0);
     CHECK_EQ(markRadioFrequency(7041501.0, "RTTY", true, onLsb.markFreq, -0.3), 7041501.0);
+    // A skimmer channel is its audio mark's distance from the tones in use (issue #31,
+    // the skimmer 2 kHz off in RTTY mode). Dial 14090.980 in RTTY, a station 125 Hz above
+    // the configured mark in the audio is 125 Hz below the dial; on the tones, it is the dial.
+    CHECK_EQ(std::lround(markRadioFrequency(14090980.0, "RTTY", true, onLsb.markFreq, 2125.0 - onLsb.markFreq)), 14090980L);
+    CHECK_EQ(std::lround(markRadioFrequency(14090980.0, "RTTY", true, onLsb.markFreq, 2250.0 - onLsb.markFreq)), 14090855L);
+    CHECK_EQ(std::lround(markRadioFrequency(14090980.0, "RTTYR", false, onLsb.markFreq, 2250.0 - onLsb.markFreq)), 14091105L);
+    // On a sideband it is the same as dial -/+ the channel's audio mark.
+    CHECK_EQ(std::lround(markRadioFrequency(14093000.0, "LSB", true, onLsb.markFreq, 1800.0 - onLsb.markFreq)), 14091200L);
+    CHECK_EQ(std::lround(markRadioFrequency(14089000.0, "USB", false, onUsb.markFreq, 1800.0 - onUsb.markFreq)), 14090800L);
   }
   TEST_MAIN_END();
 }

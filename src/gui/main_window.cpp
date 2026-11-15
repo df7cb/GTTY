@@ -1078,6 +1078,16 @@ bool MainWindow::lsbLike() const {
   return m == "LSB" || m == "RTTY" || m == "PKTLSB" || m == "CWR";
 }
 
+// Issue #31: a skimmer channel is its distance from the tones in use, as AFC is. On a
+// sideband that comes to dial -/+ the channel's audio mark; in the rig's RTTY modes (FSK)
+// the dial is the mark of a signal on the tones, so a channel there must not count the
+// whole audio tone again (it put stations about 2 kHz off).
+double MainWindow::audioMarkRadioFrequency(double audioMarkHz) const {
+  const double tone = activeRtty().markFreq;
+  return markRadioFrequency(dialFreqHz(), rigState_.connected ? rigState_.mode : "", lsbLike(), tone,
+                            audioMarkHz - tone);
+}
+
 bool MainWindow::sidebandSwap() const {
   return settings_.followRigSideband && rigState_.connected && isUpperSidebandMode(rigState_.mode);
 }
@@ -2018,7 +2028,7 @@ void MainWindow::spotSkimmed(const std::string& text, double markHz) {
   // Only the recent text: an earlier station on the same frequency is not spotted again.
   std::string call = spottableCall(text.size() > 90 ? text.substr(text.size() - 90) : text, settings_.myCall, &cq);
   if (call.empty()) return;
-  double rf = lsbLike() ? dialFreqHz() - markHz : dialFreqHz() + markHz;   // RTTY is spotted on its mark frequency
+  double rf = audioMarkRadioFrequency(markHz);   // RTTY is spotted on its mark frequency
   if (rf <= 0) return;
   int64_t now = g_get_monotonic_time();
   auto it = sentSpots_.find(call);
@@ -2046,7 +2056,7 @@ void MainWindow::rebuildSkimList() {
   int64_t now = g_get_monotonic_time();
   for (size_t i = 0; i < skim_.size(); ++i) {
     const SkimEntry& s = skim_[i];
-    double rf = lsbLike() ? dialFreqHz() - s.markHz : dialFreqHz() + s.markHz;
+    double rf = audioMarkRadioFrequency(s.markHz);
     GtkWidget* box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
     GtkWidget* top = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
     char f[32];

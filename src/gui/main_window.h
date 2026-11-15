@@ -75,6 +75,8 @@ class MainWindow {
   // Lower-sideband operation: audio frequency rises as RF falls. RTTY is LSB by
   // convention, so this is also the assumption without a rig.
   bool lsbLike() const;
+  // The radio frequency of a signal whose mark is at `audioMarkHz` in the audio (a skimmer channel).
+  double audioMarkRadioFrequency(double audioMarkHz) const;
   // The rig is on the upper sideband and gtty follows it: mark and space are exchanged.
   bool sidebandSwap() const;
   // The tones in use: the configured ones, exchanged while sidebandSwap().
