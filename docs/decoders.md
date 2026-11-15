@@ -99,8 +99,8 @@ Some radios print what their own RTTY decoder reads as plain text on a serial po
 
 On the radio:
 
-- **Icom IC-7610, IC-9700:** the USB cable carries two serial ports. Set *USB (B) Function* to **RTTY Decode** and note the *Decode Baud Rate*. The first port stays free for CI-V.
-- **Icom IC-7300:** there is one serial port, which carries either CI-V or the decoder (*USB Serial Function*). With the decoder on it, rig control needs the CI-V jack.
+- **Icom IC-7610, IC-9700, IC-7300MKII:** the USB cable carries two serial ports. Set *USB (B) Function* to **RTTY Decode** and note the *Decode Baud Rate*. The first port (A) stays free for CI-V.
+- **Icom IC-7300 (the original):** there is one serial port, which carries either CI-V or the decoder (*USB Serial Function*). With the decoder on it, rig control needs the rear CI-V (REMOTE) jack and a CI-V interface, or no rig control at all; the Radio pane works either way.
 - The radio's RTTY decoder must be running (the DECODE screen), in RTTY mode.
 
 The port may be the one whose DTR or RTS line keys FSK or PTT: gtty reads it and keys it at the same time. It cannot be the port used for **UART** FSK, nor the rig control port.
