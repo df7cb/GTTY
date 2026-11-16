@@ -1351,6 +1351,21 @@ void MainWindow::insertTxText(const std::string& text) {
 // back to receive when the text has been sent (see poll()).
 void MainWindow::insertLoggerTxText(const std::string& text) {
   TxControlText t = extractTxControls(text);
+  // A logger's Backspace (0x08, e.g. TLF while typing) erases the last character
+  // of the TX pane if it has not gone out yet. Once sent it cannot be taken back:
+  // ITA2 has no backspace code, so the BS is dropped.
+  size_t start = 0;
+  for (size_t bs; (bs = t.text.find('\b', start)) != std::string::npos; start = bs + 1) {
+    if (bs > start) insertTxText(t.text.substr(start, bs - start));
+    GtkTextIter sent, end;
+    gtk_text_buffer_get_iter_at_mark(txBuf_, &sent, txSentMark_);
+    gtk_text_buffer_get_end_iter(txBuf_, &end);
+    if (gtk_text_iter_compare(&end, &sent) <= 0) continue;
+    GtkTextIter prev = end;
+    gtk_text_iter_backward_char(&prev);
+    gtk_text_buffer_delete(txBuf_, &prev, &end);
+  }
+  t.text.erase(0, start);
   if (!t.text.empty()) insertTxText(t.text);
   if (t.returnToRx && (tx_.transmitting() || !unsentTxText().empty())) rxWhenTxEmpty_ = true;
 }
