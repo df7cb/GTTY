@@ -10,6 +10,7 @@
 #include "core/log/callbook.h"
 #include "core/modem/codec2_demod.h"
 #include "core/rig/rig_control.h"
+#include "core/rig/serial_ports.h"
 
 namespace gtty {
 
@@ -73,6 +74,59 @@ GtkWidget* entry(GtkWidget* g, const char* title, const std::string& value) {
   adw_preferences_row_set_title(ADW_PREFERENCES_ROW(r), title);
   gtk_editable_set_text(GTK_EDITABLE(r), value.c_str());
   adw_preferences_group_add(ADW_PREFERENCES_GROUP(g), r);
+  return r;
+}
+// The ports are listed afresh each time the list opens, so a USB cable plugged in with
+// Preferences open shows up. Picking one fills the field, which stays free to type in.
+void fillPortList(GtkPopover* pop, gpointer row) {
+  GtkWidget* box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+  bool offerNet = g_object_get_data(G_OBJECT(row), "gtty-offer-net") != nullptr;
+  std::vector<SerialPortInfo> ports = listSerialPorts();
+  if (offerNet) ports.push_back({"localhost:4532", "rigctld on this machine (NET rigctl)"});
+  auto add = [&](const std::string& path, const std::string& detail) {
+    GtkWidget* b = gtk_button_new();
+    gtk_widget_add_css_class(b, "flat");
+    std::string label = detail.empty() ? path : path + "  (" + detail + ")";
+    GtkWidget* l = gtk_label_new(label.c_str());
+    gtk_label_set_xalign(GTK_LABEL(l), 0.0f);
+    gtk_button_set_child(GTK_BUTTON(b), l);
+    g_object_set_data_full(G_OBJECT(b), "gtty-path", g_strdup(path.c_str()), g_free);
+    g_signal_connect(b, "clicked", G_CALLBACK(+[](GtkButton* btn, gpointer r) {
+      gtk_editable_set_text(GTK_EDITABLE(r), static_cast<const char*>(g_object_get_data(G_OBJECT(btn), "gtty-path")));
+      if (GtkWidget* p = gtk_widget_get_ancestor(GTK_WIDGET(btn), GTK_TYPE_POPOVER)) gtk_popover_popdown(GTK_POPOVER(p));
+    }), row);
+    gtk_box_append(GTK_BOX(box), b);
+  };
+  for (const auto& p : ports) add(p.path, p.detail);
+  if (ports.empty()) {
+    GtkWidget* l = gtk_label_new("No serial ports found");
+    gtk_widget_add_css_class(l, "dim-label");
+    gtk_widget_set_margin_top(l, 6); gtk_widget_set_margin_bottom(l, 6);
+    gtk_widget_set_margin_start(l, 6); gtk_widget_set_margin_end(l, 6);
+    gtk_box_append(GTK_BOX(box), l);
+  }
+  GtkWidget* scroll = gtk_scrolled_window_new();
+  gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scroll), GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
+  gtk_scrolled_window_set_propagate_natural_height(GTK_SCROLLED_WINDOW(scroll), TRUE);
+  gtk_scrolled_window_set_propagate_natural_width(GTK_SCROLLED_WINDOW(scroll), TRUE);
+  gtk_scrolled_window_set_max_content_height(GTK_SCROLLED_WINDOW(scroll), 320);
+  gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scroll), box);
+  gtk_popover_set_child(pop, scroll);
+}
+// An entry row for a serial device, with a button listing the ports found. offerNet adds
+// rigctld's address, for the Hamlib device field.
+GtkWidget* deviceEntry(GtkWidget* g, const char* title, const std::string& value, bool offerNet = false) {
+  GtkWidget* r = entry(g, title, value);
+  if (offerNet) g_object_set_data(G_OBJECT(r), "gtty-offer-net", GINT_TO_POINTER(1));
+  GtkWidget* pop = gtk_popover_new();
+  g_signal_connect(pop, "show", G_CALLBACK(fillPortList), r);
+  GtkWidget* btn = gtk_menu_button_new();
+  gtk_menu_button_set_icon_name(GTK_MENU_BUTTON(btn), "pan-down-symbolic");
+  gtk_menu_button_set_popover(GTK_MENU_BUTTON(btn), pop);
+  gtk_widget_set_valign(btn, GTK_ALIGN_CENTER);
+  gtk_widget_add_css_class(btn, "flat");
+  gtk_widget_set_tooltip_text(btn, "Serial ports found on this computer");
+  adw_entry_row_add_suffix(ADW_ENTRY_ROW(r), btn);
   return r;
 }
 GtkWidget* spin(GtkWidget* g, const char* title, double lo, double hi, double step, double value, int digits = 0) {
@@ -293,14 +347,14 @@ void showPrefsDialog(GtkWidget* parent, Settings& s, std::function<void()> onApp
       if (m.model == s.rig.model) sel = static_cast<int>(i);
     }
     pr->rigModel = combo(g, "Rig model", names, sel, true);
-    pr->rigDevice = entry(g, "Device (serial port, or host:port for NET rigctl)", s.rig.device);
+    pr->rigDevice = deviceEntry(g, "Device (serial port, or host:port for NET rigctl)", s.rig.device, true);
     pr->rigBaud = spin(g, "Serial speed (0 = default)", 0, 115200, 1200, s.rig.baud);
     GtkWidget* g2 = group(pg, "PTT");
     static const char* ptts[] = {"RIG", "DTR", "RTS", "NONE"};
     int pttSel = 0;
     for (int i = 0; i < 4; ++i) if (s.rig.pttType == ptts[i]) pttSel = i;
     pr->pttType = combo(g2, "PTT method", {"CAT command", "Serial DTR", "Serial RTS", "None (VOX)"}, pttSel);
-    pr->pttDevice = entry(g2, "PTT serial device (blank = rig device; a port of its own also works with NET rigctl)", s.rig.pttDevice);
+    pr->pttDevice = deviceEntry(g2, "PTT serial device (blank = rig device; a port of its own also works with NET rigctl)", s.rig.pttDevice);
     pr->pollMs = spin(g2, "Poll interval (ms)", 100, 5000, 50, s.rig.pollMs);
     GtkWidget* gf = group(pg, "Receiver filter");
     pr->rigFilter = spin(gf, "Filter width to select on connect (Hz, 0 = leave)", 0, 6000, 50, s.rigFilterHz);
@@ -384,7 +438,7 @@ void showPrefsDialog(GtkWidget* parent, Settings& s, std::function<void()> onApp
     GtkWidget* gr = group(pg, "Radio's built-in decoder");
     pr->radioDec = toggle(gr, "Show what the radio decodes", s.radioDecoderEnabled,
                           "For radios that print their own RTTY decoder on a serial port, such as the second USB port of an Icom IC-7610 or IC-9700 set to RTTY Decode. It gets a pane of its own and does not take part in the best-guess vote");
-    pr->radioDecDevice = entry(gr, "Serial device the radio prints on (may be the FSK or PTT port)", s.radioDecoderDevice);
+    pr->radioDecDevice = deviceEntry(gr, "Serial device the radio prints on (may be the FSK or PTT port)", s.radioDecoderDevice);
     std::vector<std::string> bauds;
     int baudSel = 3;
     for (int i = 0; i < kRadioDecoderBaudCount; ++i) {
@@ -399,7 +453,7 @@ void showPrefsDialog(GtkWidget* parent, Settings& s, std::function<void()> onApp
     GtkWidget* g = group(pg, "Keying");
     pr->txMethod = combo(g, "Method", {"AFSK (audio)", "FSK via serial UART TXD", "FSK via DTR", "FSK via RTS", "CAT text (rig keyer, K3/K4/TS-890)"},
                          static_cast<int>(s.tx.method));
-    pr->fskDevice = entry(g, "FSK serial device", s.tx.fskDevice);
+    pr->fskDevice = deviceEntry(g, "FSK serial device", s.tx.fskDevice);
     pr->fskInvert = toggle(g, "Invert FSK polarity (DTR/RTS)", s.tx.fskInvert);
     pr->diddle = toggle(g, "Diddle (send LTRS when idle)", s.tx.diddle);
     pr->wordMode = toggle(g, "Word mode type-ahead", s.txWordMode, "Send typed text only after each space or Enter, so typos can be fixed");

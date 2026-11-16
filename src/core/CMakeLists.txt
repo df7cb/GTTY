@@ -17,6 +17,7 @@ add_library(gttycore STATIC
   rig/fsk_keyer.cpp
   rig/serial_ptt.cpp
   rig/rig_decode_port.cpp
+  rig/serial_ports.cpp
   log/logbook.cpp
   log/adif.cpp
   log/callsign.cpp
