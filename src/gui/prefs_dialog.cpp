@@ -18,6 +18,8 @@ namespace {
 
 const int kRadioDecoderBauds[] = {1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200};
 const int kRadioDecoderBaudCount = 8;
+// Offered in the rig's serial speed list; any other speed can be typed in.
+const int kSerialSpeeds[] = {1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200, 230400};
 
 struct Prefs {
   Settings* s;
@@ -76,6 +78,31 @@ GtkWidget* entry(GtkWidget* g, const char* title, const std::string& value) {
   adw_preferences_group_add(ADW_PREFERENCES_GROUP(g), r);
   return r;
 }
+// A flat button in a pick list: clicking it puts value into the entry row and closes
+// the list.
+GtkWidget* pickButton(gpointer row, const std::string& value, const std::string& label) {
+  GtkWidget* b = gtk_button_new();
+  gtk_widget_add_css_class(b, "flat");
+  GtkWidget* l = gtk_label_new(label.c_str());
+  gtk_label_set_xalign(GTK_LABEL(l), 0.0f);
+  gtk_button_set_child(GTK_BUTTON(b), l);
+  g_object_set_data_full(G_OBJECT(b), "gtty-value", g_strdup(value.c_str()), g_free);
+  g_signal_connect(b, "clicked", G_CALLBACK(+[](GtkButton* btn, gpointer r) {
+    gtk_editable_set_text(GTK_EDITABLE(r), static_cast<const char*>(g_object_get_data(G_OBJECT(btn), "gtty-value")));
+    if (GtkWidget* p = gtk_widget_get_ancestor(GTK_WIDGET(btn), GTK_TYPE_POPOVER)) gtk_popover_popdown(GTK_POPOVER(p));
+  }), row);
+  return b;
+}
+// A drop-down button at the end of an entry row, opening pop.
+void addPickButton(GtkWidget* row, GtkWidget* pop, const char* tooltip) {
+  GtkWidget* btn = gtk_menu_button_new();
+  gtk_menu_button_set_icon_name(GTK_MENU_BUTTON(btn), "pan-down-symbolic");
+  gtk_menu_button_set_popover(GTK_MENU_BUTTON(btn), pop);
+  gtk_widget_set_valign(btn, GTK_ALIGN_CENTER);
+  gtk_widget_add_css_class(btn, "flat");
+  gtk_widget_set_tooltip_text(btn, tooltip);
+  adw_entry_row_add_suffix(ADW_ENTRY_ROW(row), btn);
+}
 // The ports are listed afresh each time the list opens, so a USB cable plugged in with
 // Preferences open shows up. Picking one fills the field, which stays free to type in.
 void fillPortList(GtkPopover* pop, gpointer row) {
@@ -83,21 +110,8 @@ void fillPortList(GtkPopover* pop, gpointer row) {
   bool offerNet = g_object_get_data(G_OBJECT(row), "gtty-offer-net") != nullptr;
   std::vector<SerialPortInfo> ports = listSerialPorts();
   if (offerNet) ports.push_back({"localhost:4532", "rigctld on this machine (NET rigctl)"});
-  auto add = [&](const std::string& path, const std::string& detail) {
-    GtkWidget* b = gtk_button_new();
-    gtk_widget_add_css_class(b, "flat");
-    std::string label = detail.empty() ? path : path + "  (" + detail + ")";
-    GtkWidget* l = gtk_label_new(label.c_str());
-    gtk_label_set_xalign(GTK_LABEL(l), 0.0f);
-    gtk_button_set_child(GTK_BUTTON(b), l);
-    g_object_set_data_full(G_OBJECT(b), "gtty-path", g_strdup(path.c_str()), g_free);
-    g_signal_connect(b, "clicked", G_CALLBACK(+[](GtkButton* btn, gpointer r) {
-      gtk_editable_set_text(GTK_EDITABLE(r), static_cast<const char*>(g_object_get_data(G_OBJECT(btn), "gtty-path")));
-      if (GtkWidget* p = gtk_widget_get_ancestor(GTK_WIDGET(btn), GTK_TYPE_POPOVER)) gtk_popover_popdown(GTK_POPOVER(p));
-    }), row);
-    gtk_box_append(GTK_BOX(box), b);
-  };
-  for (const auto& p : ports) add(p.path, p.detail);
+  for (const auto& p : ports)
+    gtk_box_append(GTK_BOX(box), pickButton(row, p.path, p.detail.empty() ? p.path : p.path + "  (" + p.detail + ")"));
   if (ports.empty()) {
     GtkWidget* l = gtk_label_new("No serial ports found");
     gtk_widget_add_css_class(l, "dim-label");
@@ -120,13 +134,38 @@ GtkWidget* deviceEntry(GtkWidget* g, const char* title, const std::string& value
   if (offerNet) g_object_set_data(G_OBJECT(r), "gtty-offer-net", GINT_TO_POINTER(1));
   GtkWidget* pop = gtk_popover_new();
   g_signal_connect(pop, "show", G_CALLBACK(fillPortList), r);
-  GtkWidget* btn = gtk_menu_button_new();
-  gtk_menu_button_set_icon_name(GTK_MENU_BUTTON(btn), "pan-down-symbolic");
-  gtk_menu_button_set_popover(GTK_MENU_BUTTON(btn), pop);
-  gtk_widget_set_valign(btn, GTK_ALIGN_CENTER);
-  gtk_widget_add_css_class(btn, "flat");
-  gtk_widget_set_tooltip_text(btn, "Serial ports found on this computer");
-  adw_entry_row_add_suffix(ADW_ENTRY_ROW(r), btn);
+  addPickButton(r, pop, "Serial ports found on this computer");
+  return r;
+}
+// The serial speed as typed: blank (or 0) for the backend's default, otherwise a whole
+// number of bits per second. -1 when it is neither.
+int parseSerialSpeed(const std::string& t) {
+  size_t a = t.find_first_not_of(" \t"), b = t.find_last_not_of(" \t");
+  if (a == std::string::npos) return 0;
+  std::string v = t.substr(a, b - a + 1);
+  if (v.size() > 7 || v.find_first_not_of("0123456789") != std::string::npos) return -1;
+  return std::stoi(v);
+}
+// An entry row for a serial speed, with a list of the common ones. Any other speed can
+// be typed; a field that is not a number is marked and leaves the saved speed as it was.
+GtkWidget* speedEntry(GtkWidget* g, const char* title, int value) {
+  GtkWidget* r = entry(g, title, value > 0 ? std::to_string(value) : "");
+  g_signal_connect(r, "changed", G_CALLBACK(+[](GtkEditable* e, gpointer) {
+    if (parseSerialSpeed(gtk_editable_get_text(e)) < 0) gtk_widget_add_css_class(GTK_WIDGET(e), "error");
+    else gtk_widget_remove_css_class(GTK_WIDGET(e), "error");
+  }), nullptr);
+  GtkWidget* box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+  gtk_box_append(GTK_BOX(box), pickButton(r, "", "Rig default"));
+  for (int v : kSerialSpeeds) gtk_box_append(GTK_BOX(box), pickButton(r, std::to_string(v), std::to_string(v)));
+  GtkWidget* scroll = gtk_scrolled_window_new();
+  gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scroll), GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
+  gtk_scrolled_window_set_propagate_natural_height(GTK_SCROLLED_WINDOW(scroll), TRUE);
+  gtk_scrolled_window_set_propagate_natural_width(GTK_SCROLLED_WINDOW(scroll), TRUE);
+  gtk_scrolled_window_set_max_content_height(GTK_SCROLLED_WINDOW(scroll), 320);
+  gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scroll), box);
+  GtkWidget* pop = gtk_popover_new();
+  gtk_popover_set_child(GTK_POPOVER(pop), scroll);
+  addPickButton(r, pop, "Common serial speeds");
   return r;
 }
 GtkWidget* spin(GtkWidget* g, const char* title, double lo, double hi, double step, double value, int digits = 0) {
@@ -177,7 +216,7 @@ gboolean onCloseRequest(GtkWindow*, gpointer p) {
   int m = selected(pr->rigModel);
   if (m >= 0 && m < static_cast<int>(pr->models.size())) s.rig.model = pr->models[m].model;
   s.rig.device = text(pr->rigDevice);
-  s.rig.baud = static_cast<int>(value(pr->rigBaud));
+  if (int baud = parseSerialSpeed(text(pr->rigBaud)); baud >= 0) s.rig.baud = baud;
   static const char* ptts[] = {"RIG", "DTR", "RTS", "NONE"};
   s.rig.pttType = ptts[selected(pr->pttType)];
   s.rig.pttDevice = text(pr->pttDevice);
@@ -348,7 +387,7 @@ void showPrefsDialog(GtkWidget* parent, Settings& s, std::function<void()> onApp
     }
     pr->rigModel = combo(g, "Rig model", names, sel, true);
     pr->rigDevice = deviceEntry(g, "Device (serial port, or host:port for NET rigctl)", s.rig.device, true);
-    pr->rigBaud = spin(g, "Serial speed (0 = default)", 0, 115200, 1200, s.rig.baud);
+    pr->rigBaud = speedEntry(g, "Serial speed (bps, blank = rig default)", s.rig.baud);
     GtkWidget* g2 = group(pg, "PTT");
     static const char* ptts[] = {"RIG", "DTR", "RTS", "NONE"};
     int pttSel = 0;
