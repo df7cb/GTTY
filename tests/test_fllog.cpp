@@ -87,13 +87,13 @@ struct FakeLogbook {
       } else {
         ok = false;
       }
-      std::string out = ok ? answer : std::string("HTTP/1.1 400 Internal Error\r\n");
-      ::send(c, out.data(), out.size(), net::sendFlags());
-      ::close(c);
       if (ok) {
         std::lock_guard<std::mutex> lk(mu);
         records.push_back(unescape(value));
       }
+      std::string out = ok ? answer : std::string("HTTP/1.1 400 Internal Error\r\n");
+      ::send(c, out.data(), out.size(), net::sendFlags());
+      ::close(c);
     }
   }
 };
