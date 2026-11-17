@@ -28,6 +28,7 @@ add_library(gttycore STATIC
   net/xmlrpc_server.cpp
   net/cluster_client.cpp
   net/fllog_client.cpp
+  net/xlog_client.cpp
   net/spot_server.cpp
   net/psk_reporter.cpp
   macros.cpp

@@ -83,6 +83,7 @@ MainWindow::~MainWindow() {
   spotServer_.stop();
   pskr_.close(static_cast<uint32_t>(g_get_real_time() / G_USEC_PER_SEC));
   fllog_.stop();
+  xlog_.stop();
   cluster_.stop();
   if (callLookupId_) g_source_remove(callLookupId_);
   if (tickId_) g_source_remove(tickId_);
@@ -1655,6 +1656,7 @@ void MainWindow::logQso() {
   if (!log_.add(q, err)) { toast("Log failed: " + err); return; }
   gtReportQso(q);
   fllogReportQso(q);
+  xlogReportQso(q);
   toast("Logged " + q.call);
   bandMapDirty_ = true;   // dupe coloring
   gtk_spin_button_spin(GTK_SPIN_BUTTON(serialSpin_), GTK_SPIN_STEP_FORWARD, 1);
@@ -2966,6 +2968,16 @@ void MainWindow::fllogReportQso(const Qso& q) {
   };
   fllog_.setTarget(settings_.fllogHost, static_cast<uint16_t>(settings_.fllogPort));
   fllog_.add(q.call, adifRecord(q, settings_.myCall, settings_.myGrid, AdifStyle::Fldigi));
+}
+
+// The same QSO to Xlog, as fldigi and gMFSK hand it over.
+void MainWindow::xlogReportQso(const Qso& q) {
+  if (!settings_.xlogEnabled) return;
+  xlog_.onResult = [this](bool ok, const std::string& call, const std::string& err) {
+    if (!ok) events_.push(MessageEvent{"Xlog: " + call + " not sent (" + err + ")", true});
+  };
+  xlog_.setTarget(settings_.xlogHost, static_cast<uint16_t>(settings_.xlogPort));
+  xlog_.add(q.call, xlogRemoteRecord(q, std::string("gtty v ") + gtty::version()));
 }
 
 void MainWindow::gtHandle(const wsjtx::Incoming& in) {

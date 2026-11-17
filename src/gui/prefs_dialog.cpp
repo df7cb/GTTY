@@ -41,6 +41,7 @@ struct Prefs {
   GtkWidget *rxTimestamps, *rxLogToFile, *rxLogDir;
   GtkWidget *rpcEnabled, *rpcBind, *rpcPort;
   GtkWidget *fllogEnabled, *fllogHost, *fllogPort;
+  GtkWidget *xlogEnabled, *xlogHost, *xlogPort;
   GtkWidget *spotEnabled, *spotCqOnly, *spotBind, *spotPort;
   GtkWidget* pskrEnabled;
   GtkWidget *myCall, *myName, *myQth, *myGrid;
@@ -294,6 +295,9 @@ gboolean onCloseRequest(GtkWindow*, gpointer p) {
   s.fllogEnabled = active(pr->fllogEnabled);
   s.fllogHost = text(pr->fllogHost);
   s.fllogPort = static_cast<int>(value(pr->fllogPort));
+  s.xlogEnabled = active(pr->xlogEnabled);
+  s.xlogHost = text(pr->xlogHost);
+  s.xlogPort = static_cast<int>(value(pr->xlogPort));
   s.spotServerEnabled = active(pr->spotEnabled);
   s.spotServerCqOnly = active(pr->spotCqOnly);
   s.spotServerBind = text(pr->spotBind);
@@ -621,6 +625,11 @@ void showPrefsDialog(GtkWidget* parent, Settings& s, std::function<void()> onApp
                               "Each QSO logged in gtty is handed over as fldigi hands it to fllog (XML-RPC log.add_record)");
     pr->fllogHost = entry(g4, "Host", s.fllogHost);
     pr->fllogPort = spin(g4, "Port (fllog and QLog: 8421)", 1, 65535, 1, s.fllogPort);
+    GtkWidget* gx = group(pg, "Xlog");
+    pr->xlogEnabled = toggle(gx, "Send logged QSOs", s.xlogEnabled,
+                             "Each QSO logged in gtty is handed to Xlog as fldigi hands it over (Xlog remote data)");
+    pr->xlogHost = entry(gx, "Host", s.xlogHost);
+    pr->xlogPort = spin(gx, "Port (Xlog: 7311)", 1, 65535, 1, s.xlogPort);
     GtkWidget* g5 = group(pg, "Skimmer spot feed (telnet)");
     pr->spotEnabled = toggle(g5, "Serve skimmer spots", s.spotServerEnabled,
                              "Loggers connect as to a DX cluster and get a spot for every station the Skimmer identifies. Needs the Skimmer on");

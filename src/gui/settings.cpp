@@ -364,6 +364,9 @@ bool Settings::loadFrom(const std::string& path) {
   fllogEnabled = boolean(kf, "fllog", "enabled", fllogEnabled);
   fllogHost = str(kf, "fllog", "host", fllogHost);
   fllogPort = integer(kf, "fllog", "port", fllogPort);
+  xlogEnabled = boolean(kf, "xlog", "enabled", xlogEnabled);
+  xlogHost = str(kf, "xlog", "host", xlogHost);
+  xlogPort = integer(kf, "xlog", "port", xlogPort);
   spotServerEnabled = boolean(kf, "spots", "enabled", spotServerEnabled);
   spotServerBind = str(kf, "spots", "bind", spotServerBind);
   spotServerPort = integer(kf, "spots", "port", spotServerPort);
@@ -498,6 +501,9 @@ bool Settings::saveTo(const std::string& path) const {
   g_key_file_set_boolean(kf, "fllog", "enabled", fllogEnabled);
   g_key_file_set_string(kf, "fllog", "host", fllogHost.c_str());
   g_key_file_set_integer(kf, "fllog", "port", fllogPort);
+  g_key_file_set_boolean(kf, "xlog", "enabled", xlogEnabled);
+  g_key_file_set_string(kf, "xlog", "host", xlogHost.c_str());
+  g_key_file_set_integer(kf, "xlog", "port", xlogPort);
   g_key_file_set_boolean(kf, "spots", "enabled", spotServerEnabled);
   g_key_file_set_string(kf, "spots", "bind", spotServerBind.c_str());
   g_key_file_set_integer(kf, "spots", "port", spotServerPort);

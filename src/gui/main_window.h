@@ -17,6 +17,7 @@
 #include "core/macros.h"
 #include "core/net/cluster_client.h"
 #include "core/net/fllog_client.h"
+#include "core/net/xlog_client.h"
 #include "core/net/psk_reporter.h"
 #include "core/net/spot_server.h"
 #include "core/net/wsjtx_udp.h"
@@ -183,6 +184,7 @@ class MainWindow {
   void gtReportLine(const std::string& line);
   void gtReportQso(const Qso& q);
   void fllogReportQso(const Qso& q);
+  void xlogReportQso(const Qso& q);
   void openSpotServer();
   void spotSkimmed(const std::string& text, double markHz);
   void openPskReporter();
@@ -325,7 +327,8 @@ class MainWindow {
   std::string rxTextLog_;        // all primary-decoder text, for XML-RPC text.get_rx
   std::vector<double> notches_;
   xmlrpc::Server rpc_;
-  FllogForwarder fllog_;
+  RecordForwarder fllog_;
+  RecordForwarder xlog_{xlogSend};
   SpotServer spotServer_;
   PskReporter pskr_;
   std::string pskrRxText_;                    // recent text of the primary decoder, for PSK Reporter
