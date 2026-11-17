@@ -14,10 +14,10 @@
 namespace gtty {
 
 namespace {
-
 constexpr int kTimeoutMs = 4000;
+}  // namespace
 
-int connectTo(const std::string& host, uint16_t port, std::string& err) {
+int net::tcpConnect(const std::string& host, uint16_t port, int timeoutMs, std::string& err) {
   addrinfo hints{};
   hints.ai_family = AF_UNSPEC;
   hints.ai_socktype = SOCK_STREAM;
@@ -32,7 +32,7 @@ int connectTo(const std::string& host, uint16_t port, std::string& err) {
     if (errno == EINPROGRESS) {
       pollfd p{fd, POLLOUT, 0};
       int soerr = ETIMEDOUT;
-      if (::poll(&p, 1, kTimeoutMs) > 0) {
+      if (::poll(&p, 1, timeoutMs) > 0) {
         socklen_t len = sizeof soerr;
         getsockopt(fd, SOL_SOCKET, SO_ERROR, &soerr, &len);
       }
@@ -48,10 +48,8 @@ int connectTo(const std::string& host, uint16_t port, std::string& err) {
   return fd;
 }
 
-}  // namespace
-
 bool fllogAddRecord(const std::string& host, uint16_t port, const std::string& adifRecord, std::string& err) {
-  int fd = connectTo(host, port, err);
+  int fd = net::tcpConnect(host, port, kTimeoutMs, err);
   if (fd < 0) {
     if (err.empty()) err = "cannot connect";
     return false;
@@ -99,17 +97,17 @@ bool fllogAddRecord(const std::string& host, uint16_t port, const std::string& a
   return true;
 }
 
-FllogForwarder::~FllogForwarder() { stop(); }
+RecordForwarder::~RecordForwarder() { stop(); }
 
-void FllogForwarder::setTarget(const std::string& host, uint16_t port) {
+void RecordForwarder::setTarget(const std::string& host, uint16_t port) {
   std::lock_guard<std::mutex> lk(mu_);
   host_ = host.empty() ? std::string("127.0.0.1") : host;
   port_ = port;
 }
 
-void FllogForwarder::add(const std::string& label, const std::string& adifRecord) {
+void RecordForwarder::add(const std::string& label, const std::string& record) {
   std::lock_guard<std::mutex> lk(mu_);
-  jobs_.push_back({host_, port_, label, adifRecord});
+  jobs_.push_back({host_, port_, label, record});
   if (!run_) {   // first record, or first after stop(), which joined the old thread
     run_ = true;
     thread_ = std::thread([this] { loop(); });
@@ -117,7 +115,7 @@ void FllogForwarder::add(const std::string& label, const std::string& adifRecord
   cv_.notify_one();
 }
 
-void FllogForwarder::stop() {
+void RecordForwarder::stop() {
   {
     std::lock_guard<std::mutex> lk(mu_);
     run_ = false;
@@ -127,7 +125,7 @@ void FllogForwarder::stop() {
   if (thread_.joinable()) thread_.join();
 }
 
-void FllogForwarder::loop() {
+void RecordForwarder::loop() {
   for (;;) {
     Job job;
     {
@@ -138,7 +136,7 @@ void FllogForwarder::loop() {
       jobs_.pop_front();
     }
     std::string err;
-    bool ok = fllogAddRecord(job.host, job.port, job.adif, err);
+    bool ok = send_(job.host, job.port, job.record, err);
     if (onResult) onResult(ok, job.label, err);
   }
 }

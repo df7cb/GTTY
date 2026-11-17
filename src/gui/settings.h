@@ -127,6 +127,10 @@ struct Settings {
   bool fllogEnabled = false;
   std::string fllogHost = "127.0.0.1";
   int fllogPort = 8421;
+  // Logged QSOs pushed to Xlog as fldigi pushes them (Xlog "remote data", TCP 7311)
+  bool xlogEnabled = false;
+  std::string xlogHost = "127.0.0.1";
+  int xlogPort = 7311;
   // Telnet spot feed of the skimmer (loggers connect to it as to a DX cluster)
   bool spotServerEnabled = false;
   std::string spotServerBind = "127.0.0.1";

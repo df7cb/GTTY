@@ -159,7 +159,7 @@ int main() {
 
   // The forwarder: records go out in order from its own thread and each one is reported.
   {
-    FllogForwarder fwd;
+    RecordForwarder fwd;
     std::mutex rm;
     std::vector<std::string> results;
     fwd.onResult = [&](bool ok, const std::string& label, const std::string& e) {

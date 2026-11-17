@@ -5,13 +5,14 @@ nav_order: 13
 
 # Integrations
 
-gtty talks to other station software five ways, all set up under *Preferences → Integration*:
+gtty talks to other station software six ways, all set up under *Preferences → Integration*:
 
 | Interface | Direction | Used by |
 |---|---|---|
-| [WSJT-X UDP protocol](#gridtracker2-and-the-wsjt-x-udp-protocol) | gtty reports status, decodes and logged QSOs | GridTracker2; [QLog, KLog, Wavelog](#qlog-klog-and-wavelog) for logged QSOs |
+| [WSJT-X UDP protocol](#gridtracker2-and-the-wsjt-x-udp-protocol) | gtty reports status, decodes and logged QSOs | GridTracker2; [QLog, KLog, Wavelog, Log4OM](#qlog-klog-wavelog-and-log4om) for logged QSOs |
 | [fldigi-compatible XML-RPC server](#fldigi-compatible-xml-rpc) | a logger drives gtty as its modem | TLF, Not1MM, CQRLOG |
 | [Logbook server](#logbook-server-fllog-qlog) | gtty hands each logged QSO to a logbook | fllog, QLog |
+| [Xlog remote data](#xlog) | gtty hands each logged QSO to Xlog | Xlog |
 | [Skimmer spot feed](#skimmer-spot-feed) | loggers connect to gtty as to a DX cluster | TLF, Not1MM, QLog and other band maps |
 | [PSK Reporter](#psk-reporter) | gtty reports the stations it decodes | the pskreporter.info map |
 
@@ -39,13 +40,14 @@ If WSJT-X is also running, GridTracker accepts several senders on the same port.
 
 The three switches under **What to exchange** turn off the decode reports, the logged-QSO reports or the acceptance of replies.
 
-## QLog, KLog and Wavelog
+## QLog, KLog, Wavelog and Log4OM
 
 These logbooks take QSOs from WSJT-X over the same UDP protocol, and so from gtty: with **Report logged QSOs** on, every QSO logged in gtty is sent as a *QSO Logged* and a *Logged ADIF* message.
 
 - **[QLog](https://github.com/foldynl/QLog)**: it listens for WSJT-X on UDP port 2237 unless set otherwise in its network settings. Point gtty's **UDP port** at it. QLog can also take the QSOs through its fldigi interface instead; see [Logbook server](#logbook-server-fllog-qlog). Use one of the two, or each QSO arrives twice.
 - **[KLog](https://github.com/ea4k/klog)**: in its setup, on the WSJT-X page, start the UDP server on port 2237 and tick *Allow WSJT-X to send logged QSOs to KLog*; with the automatic-logging box ticked as well, KLog logs without asking.
 - **[Wavelog](https://github.com/wavelog/wavelog)** through [WaveLogGate](https://github.com/wavelog/WaveLogGate): it listens on UDP port 2333; set gtty's **UDP port** to 2333.
+- **[Log4OM 2](https://www.log4om.com/)** (Windows; on Linux under Wine): in its program configuration, under *Connections*, add a **UDP inbound** connection of type **JT_MESSAGE** on the port gtty sends to (2237 by default), then save and apply. Log4OM treats gtty as a WSJT-X instance and logs each *QSO Logged* message. Under Wine, 127.0.0.1 reaches the Windows program from gtty on the Linux side. Not tested against Log4OM yet; reports welcome.
 
 The messages carry the callsign, frequency, mode (RTTY), both reports, the sent serial number and the received exchange (ADIF `STX_STRING` and `SRX_STRING`), name, locator, and your callsign and locator from *Preferences → Station*.
 
@@ -185,6 +187,20 @@ fldigi can keep its log in a separate logbook program: it sends each QSO to the 
 Each QSO logged with the Log button, **Ctrl+L** or a `<LOG>` macro is then sent as well as stored in gtty's own logbook. If the logbook program cannot be reached gtty says so in a notice and the QSO stays in gtty's logbook only; export it later with *Export ADIF*.
 
 This is for operating from gtty's own log row. When a contest logger drives gtty over XML-RPC, the logger keeps the log and this stays off.
+
+## Xlog
+
+[Xlog](https://savannah.nongnu.org/projects/xlog) takes QSOs from other programs as "remote data": fldigi and gMFSK log to it this way. gtty sends the same record to the TCP port Xlog listens on (7311), so it works on Linux and macOS, and with Xlog on another machine.
+
+1. Start Xlog and open a log. With no log open, Xlog refuses remote data.
+2. In Xlog's *Preferences*, choose what remote data does: add the QSO to the log straight away, or only fill in Xlog's QSO entry fields for you to check and save.
+3. In gtty, *Preferences → Integration → Xlog*: tick **Send logged QSOs**, and set **Host** and **Port** (127.0.0.1 and 7311 by default).
+
+Each QSO logged in gtty then goes to Xlog with the date, time (UTC), callsign, frequency in MHz, mode RTTY, both reports, name, QTH, locator and the comment. The received exchange goes into Xlog's first free field and the sent serial number into the second; if those fields are hidden in Xlog, both are added to the remarks.
+
+Xlog does not acknowledge a record. gtty reports a failure only when it cannot connect, so check Xlog's status bar ("Remote data received from gtty") the first time. If the QSO goes nowhere, Xlog has no log open, or the log is read-only.
+
+Xlog can also take QSOs as ADIF on UDP port 2333, but use the remote-data route above: Xlog maps its fields itself there. Do not send gtty's WSJT-X UDP messages to port 2333 for Xlog; they are in a binary format Xlog does not read.
 
 ## Skimmer spot feed
 
